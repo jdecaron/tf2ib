@@ -357,10 +357,9 @@ def whois(connection, event):
     userStatus = event.arguments()[1]
 
 # Connection information
-network = '127.0.0.1'
-#network = 'irc.gamesurge.net'
+network = 'irc.gamesurge.net'
 port = 6667
-channel = '#tf2.gather.us'
+channel = '#tf2.test.us'
 nick = 'PUG-BOT'
 name = 'BOT'
 
