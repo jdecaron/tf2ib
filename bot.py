@@ -387,7 +387,6 @@ irc = irclib.IRC()
 # Create a server object, connect and join the channel
 server = irc.server()
 server.connect ( network, port, nick, ircname = name )
-#server.join ( channel )
 
 irc.add_global_handler ( 'nick', nickChange )
 irc.add_global_handler ( 'privmsg', privmsg )
