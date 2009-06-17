@@ -3,9 +3,12 @@
 import irclib
 import random
 import re
+import sqlite3
 import string
 import threading
 import time
+
+#irclib.DEBUG = 1
 
 def add(userName, userCommand):
     global state
@@ -125,21 +128,23 @@ def buildTeams():
     return 0
 
 def checkIfUserIsAdmin(event):
-    global userStatus
+    global userChannel
     user = extractUserName(event.source())
     server.whois([user])
-    while 1:
+    counter = 0
+    while userChannel == '' and counter < 100:
+        counter += 1
         irc.process_once(0.2)
-        if userStatus != '':
-            if re.search('@' + channel + ' ', userStatus):
-            # User is an admin.
-                userStatus = ''
-                return 1
-            else :
-            # User is not an admin.
-                userStatus = ''
-                return 0 #Debug.
         time.sleep(0.05)
+    if userChannel != '':
+        if re.search('@' + channel + ' *', userChannel):
+        # User is an admin.
+            userChannel = ''
+            return 1
+        else :
+        # User is not an admin.
+            userChannel = ''
+            return 0 #Debug.
 
 def classCount(gameClass):
     global userList
@@ -321,7 +326,9 @@ def printUserList():
             message += '"  '
         server.privmsg(channel, message)
     else:
-        timer = threading.Timer(5, printUserList)
+        if type(timer) is not int:
+            timer.cancel()
+        timer = threading.Timer(10, printUserList)
         timer.start()
 
 def stopGame():
@@ -349,17 +356,26 @@ def vent():
     server.privmsg(channel, message)
 
 def welcome(connection, event):
-    #server.send_raw ("authserv auth user password")
+    #server.send_raw ("authserv auth J550 y8hdr517")
     server.join ( channel )
 
-def whois(connection, event):
-    global userStatus
-    userStatus = event.arguments()[1]
+def whoischannels(connection, event):
+    global userChannel
+    if re.search('#', event.arguments()[1]):
+        userChannel = event.arguments()[1]
+        return 0
+
+def whoisuser(connection, event):
+    for i in event.arguments():
+        return 0
+        #print i
+    return 0
 
 # Connection information
-network = 'irc.gamesurge.net'
+#network = 'irc.gamesurge.net'
+network = '127.0.0.1'
 port = 6667
-channel = '#tf2.test.us'
+channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
@@ -378,7 +394,7 @@ timer = 0
 timer2 = 0
 userCommands = ["!add", "!addfriend", "!addfriends", "!ip", "!remove", "!vent"]
 userList = {}
-userStatus = ''
+userChannel = ''
 
 # Create an IRC object
 irc = irclib.IRC()
@@ -391,7 +407,8 @@ irc.add_global_handler ( 'nick', nickChange )
 irc.add_global_handler ( 'privmsg', privmsg )
 irc.add_global_handler ( 'pubmsg', pubmsg )
 irc.add_global_handler ( 'welcome', welcome )
-irc.add_global_handler ( 'whoischannels', whois )
+irc.add_global_handler ( 'whoischannels', whoischannels )
+irc.add_global_handler ( 'whoisuser', whoisuser )
 
 # Jump into an infinite loop
 irc.process_forever()
