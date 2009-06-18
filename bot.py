@@ -132,10 +132,9 @@ def checkIfUserIsAdmin(event):
     user = extractUserName(event.source())
     server.whois([user])
     counter = 0
-    while userChannel == '' and counter < 100:
+    while userChannel == '' and not whoisEnded and counter < 10:
         counter += 1
         irc.process_once(0.2)
-        time.sleep(0.05)
     if userChannel != '':
         if re.search('@' + channel + ' *', userChannel):
         # User is an admin.
@@ -164,6 +163,11 @@ def createUser(userName, userCommand):
     user['nick'] = userName
     return user
 
+def endofwhois(connection, event):
+    whoisEnded = 1
+    # Debug.
+    print 'end of whois'
+
 def executeCommand(userName, userCommand):
     if re.search('!add$', userCommand) or re.search('!add ', userCommand):
         add(userName, userCommand)
@@ -185,6 +189,9 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('!vent$', userCommand) or re.search('!vent ', userCommand):
         vent()
+        return 0
+    if re.search('!vote$', userCommand) or re.search('!vote ', userCommand):
+        vote(userName, userCommand)
         return 0
 
 def extractClasses(userCommand):
@@ -355,9 +362,39 @@ def vent():
     message = "Ventrilo IP : " + servers['ventrilo']['ip'] + ":" + servers['ventrilo']['port'] + "  Password : " + password
     server.privmsg(channel, message)
 
+def vote(userName, userCommand):
+    global userInfo
+    #Validation of the user vote.
+    commandList = string.split(userCommand, ' ')
+    if len(commandList) == 3:
+        if(re.search('[0-9][0-9]*', commandList[2]) and (int(commandList[2]) >= 0 and int(commandList[2]) <= 10)):
+            server.whois([commandList[1]])
+        else:
+            server.privmsg(userName, "Error, the second argument of your \"!vote\" command must be a number of 0 to 10.")
+            return 0
+    else:
+        server.privmsg(userName, "Your vote can't be registered, you don't have the right number of arguments in yout command. Here is an example of a correct vote command: \"!vote nickname 10\".")
+        return 0
+    counter = 0
+    while len(userInfo) == 0 and not whoisEnded and counter < 10:
+        counter += 1
+        irc.process_once(0.2)
+    if len(userInfo) > 0:
+        print userAuth
+        1 == 1
+        # Saving the vote in the database.
+    else:
+        server.privmsg(channel, userName + ", the user you voted for does not exist.")
+        return 0
+
 def welcome(connection, event):
     #server.send_raw ("authserv auth J550 y8hdr517")
     server.join ( channel )
+
+def whoisauth(connection, event):
+    print event.eventtype()
+    for i in event.arguments():
+        userAuth.append(i)
 
 def whoischannels(connection, event):
     global userChannel
@@ -366,14 +403,13 @@ def whoischannels(connection, event):
         return 0
 
 def whoisuser(connection, event):
+    global userInfo
     for i in event.arguments():
-        return 0
-        #print i
-    return 0
+        userInfo.append(i)
 
 # Connection information
-#network = 'irc.gamesurge.net'
-network = '127.0.0.1'
+network = 'irc.gamesurge.net'
+#network = '127.0.0.1'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -392,9 +428,12 @@ teamB = []
 servers = {'1':{'ip':'one.apoplexyservers.com', 'port':'27015'}, '2':{'ip':'two.apoplexyservers.com', 'port':'27015'}, '3':{'ip':'three.apoplexyservers.com', 'port':'27015'}, '4':{'ip':'four.apoplexyservers.com', 'port':'27015'}, '5':{'ip':'five.apoplexyservers.com', 'port':'27015'}, '7':{'ip':'8.12.21.21', 'port':'27015'}, 'ventrilo':{'ip':'vent20.gameservers.com', 'port':'4273'}}
 timer = 0
 timer2 = 0
-userCommands = ["!add", "!addfriend", "!addfriends", "!ip", "!remove", "!vent"]
-userList = {}
+userCommands = ["!add", "!addfriend", "!addfriends", "!ip", "!remove", "!vent", "!vote"]
 userChannel = ''
+userAuth = []
+userInfo = []
+userList = {}
+whoisEnded = ''
 
 # Create an IRC object
 irc = irclib.IRC()
@@ -403,12 +442,15 @@ irc = irclib.IRC()
 server = irc.server()
 server.connect ( network, port, nick, ircname = name )
 
-irc.add_global_handler ( 'nick', nickChange )
-irc.add_global_handler ( 'privmsg', privmsg )
-irc.add_global_handler ( 'pubmsg', pubmsg )
-irc.add_global_handler ( 'welcome', welcome )
-irc.add_global_handler ( 'whoischannels', whoischannels )
-irc.add_global_handler ( 'whoisuser', whoisuser )
+#irc.add_global_handler("all_events", all, -10)
+irc.add_global_handler('endofwhois', endofwhois)
+irc.add_global_handler('nick', nickChange)
+irc.add_global_handler('privmsg', privmsg)
+irc.add_global_handler('pubmsg', pubmsg)
+irc.add_global_handler('welcome', welcome)
+irc.add_global_handler('whoisauth', whoisauth)
+irc.add_global_handler('whoischannels',whoischannels)
+irc.add_global_handler('whoisuser',whoisuser)
 
 # Jump into an infinite loop
 irc.process_forever()
