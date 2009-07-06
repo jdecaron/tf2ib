@@ -140,7 +140,10 @@ def buildTeams():
 def captain():
     global teamA
     if len(teamA) > 0:
-        captainName = getTeam(captainStageList[captainStage])[0]['nick']
+        for user in getTeam(captainStageList[captainStage]):
+            if user['status'] == 'captain':
+                captainName = user['nick']
+                break
         send("PRIVMSG " + channel + ' :\x030,01Captain picking turn is to ' + captainName + '.')
     else:
         send("PRIVMSG " + channel + ' :\x030,01Picking process has not been started yet.')
@@ -363,7 +366,7 @@ def getUserRating(userName):
             return -1
 
 def help():
-    send("PRIVMSG " + channel + " :\x030,01Visit http://docs.google.com/View?id=d8zd3js_173hk3cb9c2 to get help about the PUG process.")
+    send("PRIVMSG " + channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
 
 def ip():
     global gameServer
@@ -462,6 +465,7 @@ def nickChange(connection, event):
     newUserName = event.target()
     if oldUserName in userList:
         userList[newUserName] = userList[oldUserName]
+        userList[newUserName]['nick'] = newUserName
         del userList[oldUserName]
 
 def notice(userName):
@@ -485,7 +489,7 @@ def pick(userName, userCommand):
             del commandList[counter]
         counter += 1
     userFound = 0
-    if re.search('^[0-9][0-9]*$', commandList[0]) and int(commandList[0]) > 0 and int(commandList[0]) <= len(userList):
+    if re.search('^[0-9][0-9]*$', commandList[0]) and getPlayerName(int(commandList[0])):
         commandList[0] = getPlayerName(int(commandList[0]))
         userFound = 1
     else:
@@ -588,7 +592,7 @@ def rating(userName, userCommand):
         send("NOTICE " + userName + " : Error, the user \"" + commandList[1] + "\" doesn't exists in our database.")
         return 0
     else:
-        ratingDescriptions = ['beginner', 'intermediate', 'advanced', 'excellent']
+        ratingDescriptions = ['beginner', 'intermediate', 'advanced', 'expert']
         send("PRIVMSG " + channel + " :\x030,01The user \"" + commandList[1] + "\" is rated " + ratingDescriptions[userRating] + ".")
 
 def ratings(userName):
@@ -715,13 +719,13 @@ def saveRating(votedWhoisData, voterWhoisData, vote):
             cursor.execute('INSERT INTO votes VALUES (?, ?, ?, ?)', queryData)
     connection.commit()
 
-def send(message):
+def send(message, delay = 1):
     global nextAvailableTimeSpot
     # Flood protection.
     actualTime = time.time()
-    nextAvailableTimeSpot += 1
+    nextAvailableTimeSpot += delay
     if nextAvailableTimeSpot - actualTime < 0:
-        nextAvailableTimeSpot = actualTime + 1
+        nextAvailableTimeSpot = actualTime + delay
     printInterval = nextAvailableTimeSpot - actualTime
     threading.Timer(printInterval, server.send_raw, [message]).start()
 
@@ -732,7 +736,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".", 3.5)
             userCounter += 1
         teamCounter += 1
     return 0
@@ -741,7 +745,7 @@ def rate(userName, userCommand):
     global userInfo
     #Validation of the user vote.
     commandList = string.split(userCommand, ' ')
-    validRatings = ['beginner', 'intermediate', 'advanced', 'excellent']
+    validRatings = ['beginner', 'intermediate', 'advanced', 'expert']
     if len(commandList) == 3:
         if re.search('^[0-3]$', commandList[2]) or commandList[2] in validRatings:
             if commandList[2] in validRatings:
