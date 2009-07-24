@@ -604,27 +604,27 @@ def pick(userName, userCommand):
         counter += 1
     userFound = 0
     if re.search('^[0-9][0-9]*$', commandList[0]) and getPlayerName(int(commandList[0])):
-        pickedPlayerName = getPlayerName(int(commandList[0]))
+        commandList[0] = getPlayerName(int(commandList[0]))
         userFound = 1
     else:
         # Check if this nickname exists in the player list.
         for user in userList.copy():
-            if userList[user]['nick'] == pickedPlayerName:
+            if userList[user]['nick'] == commandList[0]:
                 userFound = 1
                 break
     if not userFound:
-        send("NOTICE " + userName + " : Error, this user doesn\'t exists.") 
+        send("NOTICE " + userName + " : Error, this user doesn\'t exists.")
         return 0
     # Check if the captain specified a class.
     if gameClass == '':
-        send("NOTICE " + userName + " : Error, you must specify a class from this list : " +  ', '.join(getRemainingClasses()) + ".") 
+        send("NOTICE " + userName + " : Error, you must specify a class from this list : " +  ', '.join(getRemainingClasses()) + ".")
         return 0
     if gameClass not in getRemainingClasses():
-        send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses())) 
+        send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses()))
         return 0
     if isAuthorizedCaptain(userName):
-        send("NOTICE " + userName + " : You selected \"" + pickedPlayerName + "\" as \"" + gameClass + "\".")
-        assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[pickedPlayerName])
+        send("NOTICE " + userName + " : You selected \"" + userList[commandList[0]] + "\" as \"" + gameClass + "\".")
+        assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
         # Debug : 9
         if captainStage < 9:
             captainStage += 1
