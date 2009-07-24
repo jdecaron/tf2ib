@@ -6,6 +6,7 @@ import re
 import socket
 import sqlite3
 import string
+import SRCDS
 import thread
 import threading
 import time
@@ -17,6 +18,14 @@ def add(userName, userCommand):
     print "State : " + state
     if state != 'idle':
         if state == 'captain' or state == 'normal':
+            # Debug : 10
+            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE):
+                send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
+                return 0
+            # Debug : 11
+            if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand, re.IGNORECASE):
+                send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join as this class.")
+                return 0
             # Debug : 12
             if len(userList) < 12:
                 print "User add : " + userName + "  Command : " + userCommand
@@ -45,13 +54,13 @@ def addGame(userName, userCommand):
     resetVariables()
     global allowFriends, gameServer, state
     # Game server.
-    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand, re.IGNORECASE):
-        gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand, re.IGNORECASE)[0]
+    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
+        gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
     else:
         send("NOTICE " + userName + " : You must set a server IP. Here is an example : \"!add 127.0.0.1:27015\".")
         return 0
     # Game type.
-    if re.search('captain', userCommand, re.IGNORECASE):
+    if re.search('captain', userCommand):
         allowFriends = 0
         state = 'captain'
     else:
@@ -61,9 +70,9 @@ def addGame(userName, userCommand):
 def analyseCommand(connection, event):
     global lastCommand
     userName = extractUserName(event.source())
-    if re.match('^!', event.arguments()[0]):
+    userCommand = event.arguments()[0]
+    if re.match('^!', userCommand):
     # Check if the user is trying to pass a command to the bot.
-        userCommand = event.arguments()[0]
         if isGamesurgeCommand(userCommand):
             return 1
         if isAdminCommand(userName, userCommand):
@@ -121,6 +130,13 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
     del userList[user['nick']]
     return 0
 
+def autoGameStart():
+    global nick, startMode, state
+    server = getAvailableServer()
+    if state == 'idle' and server and startMode == 'automatic':
+        addGame(nick, '!addgame captain ' + server['ip'] + ':' + server['port'])
+        print serverList
+
 def buildTeams():
     global allowFriends, state, userList
     state = 'idle'
@@ -129,6 +145,7 @@ def buildTeams():
     for i in range(10): #Debug : 10
         assignUserToTeam('', 1, 0, userList[getAPlayer('')])
     printTeams()
+    initServer()
     sendStartPrivateMessages()
 
 def captain():
@@ -192,65 +209,74 @@ def endGame():
     print 'PUG stopped.'
 
 def executeCommand(userName, userCommand):
-    if re.search('^!add$', userCommand, re.IGNORECASE) or re.search('^!add ', userCommand, re.IGNORECASE):
+    if re.search('^!add$', userCommand) or re.search('^!add ', userCommand):
         add(userName, userCommand)
         return 0
-    if re.search('^!addfriends*', userCommand, re.IGNORECASE):
+    if re.search('^!addfriends*', userCommand):
         addFriend(userName, userCommand)
         return 0
-    if re.search('^!addgame', userCommand, re.IGNORECASE):
+    if re.search('^!addgame', userCommand):
         addGame(userName, userCommand)
         return 0
-    if re.search('^!captain', userCommand, re.IGNORECASE):
+    if re.search('^!automatic', userCommand):
+        setStartMode('automatic')
+        return 0
+    if re.search('^!captain', userCommand):
         captain()
         return 0
-    if re.search('^!endgame', userCommand, re.IGNORECASE):
+    if re.search('^!endgame', userCommand):
         endGame()
         return 0
-    if re.search('^!flood*', userCommand, re.IGNORECASE):
-        flood()
-        return 0
-    if re.search('^!needsub', userCommand, re.IGNORECASE):
-        needSub(userName, userCommand)
-        return 0
-    if re.search('^!man', userCommand, re.IGNORECASE):
-        help()
-        return 0
-    if re.search('^!mumble', userCommand, re.IGNORECASE):
-        mumble()
-        return 0
-    if re.search('^!notice', userCommand, re.IGNORECASE):
-        notice(userName)
-        return 0
-    if re.search('^!ip', userCommand, re.IGNORECASE):
+    if re.search('^!ip', userCommand):
         ip()
         return 0
-    if re.search('^!pick', userCommand, re.IGNORECASE):
+    if re.search('^!needsub', userCommand):
+        needsub(userName, userCommand)
+        return 0
+    if re.search('^!man$', userCommand):
+        help()
+        return 0
+    if re.search('^!manual', userCommand):
+        setStartMode('manual')
+        return 0
+    if re.search('^!mumble', userCommand):
+        mumble()
+        return 0
+    if re.search('^!notice', userCommand):
+        notice(userName)
+        return 0
+    if re.search('^!pick', userCommand):
         pick(userName, userCommand)
         return 0
-    if re.search('^!players', userCommand, re.IGNORECASE):
+    if re.search('^!players', userCommand):
         players(userName)
         return 0
-    if re.search('^!rate', userCommand, re.IGNORECASE):
+    if re.search('^!prototype*', userCommand):
+        prototype()
+        return 0
+    if re.search('^!rate', userCommand):
         rate(userName, userCommand)
         return 0
-    if re.search('^!rating$', userCommand, re.IGNORECASE) or re.search('^!rating ', userCommand, re.IGNORECASE):
+    if re.search('^!rating$', userCommand) or re.search('^!rating ', userCommand):
         rating(userName, userCommand)
         return 0
-    if re.search('^!ratings', userCommand, re.IGNORECASE):
+    if re.search('^!ratings', userCommand):
         ratings(userName)
         return 0
-    if re.search('^!replace', userCommand, re.IGNORECASE):
+    if re.search('^!replace', userCommand):
         replace(userName, userCommand)
         return 0
-    if re.search('^!remove', userCommand, re.IGNORECASE):
+    if re.search('^!remove', userCommand):
         remove(userName)
         return 0
-    if re.search('^!restart', userCommand, re.IGNORECASE):
+    if re.search('^!restart', userCommand):
         restartBot()
         return 0
-    if re.search('^!sub', userCommand, re.IGNORECASE):
+    if re.search('^!sub', userCommand):
         sub(userName, userCommand)
+        return 0
+    if re.search('^!votemap', userCommand):
+        #votemap(userName, userCommand)
         return 0
 
 def extractClasses(userCommand):
@@ -276,10 +302,6 @@ def firstChoiceMedic(user):
         return 1
     return 0
 
-def flood():
-    for i in range(50):
-        server.send_raw("PRIVMSG " + channel + " :Flood!")
-
 def getAPlayer(gameClass):
     global userList
     for i in range(5):
@@ -299,6 +321,17 @@ def getAPlayer(gameClass):
         return forcedList[random.randint(0,len(forcedList) - 1)]
     else:
         return forcedList[0]
+
+def getAvailableServer():
+    global serverList
+    for server in serverList:
+        if (time.time() - server['last']) >= (60 * 60):
+            return {'ip':server['dns'], 'port':server['port']}
+    return 0
+
+def getMap():
+    global mapList
+    return mapList[random.randint(0, (len(mapList) - 1))]
 
 def getNextPlayerID():
     global userList
@@ -359,6 +392,13 @@ def getRemainingClasses():
         uniqueRemainingClasses[gameClass] = gameClass
     return uniqueRemainingClasses
 
+def getServers():
+    global serverList
+    servers = []
+    for server in serverList:
+        servers.append(server['ip'])
+    return servers
+
 def getSubIndex(id):
     global subList
     counter = 0
@@ -400,9 +440,8 @@ def ip():
         send("PRIVMSG " + channel + " :" + message)
 
 def isAdmin(userName):
-    global serverList
     whoisData = whois(userName)
-    if len(whoisData) and (re.search('@' + channel + ' ', whoisData['channel']) or re.search('@' + channel + '$', whoisData['channel']) or whoisData['info'][2] in serverList):
+    if len(whoisData) and (re.search('@' + channel + ' ', whoisData['channel']) or re.search('@' + channel + '$', whoisData['channel'])):
     # User is an admin.
         return 1
     else :
@@ -429,7 +468,7 @@ def isCaptain(userName):
 def isGamesurgeCommand(userCommand):
     global gamesurgeCommands
     for command in gamesurgeCommands:
-        if re.search("^" + command, userCommand, re.IGNORECASE):
+        if re.search("^" + command, userCommand):
             return 1
     return 0
 
@@ -440,7 +479,7 @@ def isUser(userName):
         return 0
 
 def initGame():
-    global initTimer, state, teamA, teamB
+    global gameServer, initTimer, state, teamA, teamB
     print "Init game."
     if state == "normal":
         state = 'building'
@@ -454,11 +493,18 @@ def initGame():
         initTimer = threading.Timer(20, assignCaptains)
         initTimer.start()
 
+def initServer():
+    global gameServer
+    print int(string.split(gameServer, ':')[1])
+    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), 'pornstar', 10)
+    TF2Server.rcon_command('changelevel ' + getMap())
+    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
+
 def isAdminCommand(userName, userCommand):
     global adminCommands
     userCommand = string.split(userCommand, ' ')[0]
     for i in adminCommands:
-        if re.search('^' + userCommand + '$', i, re.IGNORECASE):
+        if re.search('^' + userCommand + '$', i):
             return 1
     return 0
 
@@ -481,7 +527,6 @@ def isUserCommand(userName, userCommand):
     return 0
 
 def listeningTF2Servers():
-    global serverList
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('', 50007))
     listener.listen(5)
@@ -490,9 +535,14 @@ def listeningTF2Servers():
         while 1:
             data = connection.recv(4096)
             print data
-            if data and address[0] in serverList:
-                if re.search('^!needsub', data, re.IGNORECASE):
-                    needSub('', data)
+            if data and address[0] in getServers():
+                if re.search('^!needsub', data):
+                    needsub('', data)
+                if re.search('^!gameover', data):
+                    print "^!gameover"
+                    print data
+                    server = string.split(data, ' ')[1]
+                    updateLast(string.split(server, ':')[0], string.split(server, ':')[1], 0)
             else:
                 break
 
@@ -501,13 +551,13 @@ def mumble():
     message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://internap.dl.sourceforge.net/sourceforge/mumble/Mumble-1.1.8.exe"
     send("PRIVMSG " + channel + " :" + message)
 
-def needSub(userName, userCommand):
+def needsub(userName, userCommand):
     global classList, subList
     commandList = string.split(userCommand, ' ')
     sub = {'class':'unspecified', 'id':getNextSubID(), 'server':'', 'team':'unspecified'}
     # Set the server IP.
-    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand, re.IGNORECASE):
-        sub['server'] = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand, re.IGNORECASE)[0]
+    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
+        sub['server'] = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
     else:
         send("NOTICE " + userName + " : You must set a server IP. Here is an example : \"!needsub 127.0.0.1:27015\".")
         return 0
@@ -523,7 +573,7 @@ def needSub(userName, userCommand):
     subList.append(sub)
     printSubs()
 
-def nickChange(connection, event):
+def nickchange(connection, event):
     global userList
     oldUserName = extractUserName(event.source())
     newUserName = event.target()
@@ -554,12 +604,12 @@ def pick(userName, userCommand):
         counter += 1
     userFound = 0
     if re.search('^[0-9][0-9]*$', commandList[0]) and getPlayerName(int(commandList[0])):
-        commandList[0] = getPlayerName(int(commandList[0]))
+        pickedPlayerName = getPlayerName(int(commandList[0]))
         userFound = 1
     else:
         # Check if this nickname exists in the player list.
         for user in userList.copy():
-            if userList[user]['nick'] == commandList[0]:
+            if userList[user]['nick'] == pickedPlayerName:
                 userFound = 1
                 break
     if not userFound:
@@ -573,17 +623,19 @@ def pick(userName, userCommand):
         send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses())) 
         return 0
     if isAuthorizedCaptain(userName):
-        assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
+        send("NOTICE " + userName + " : You selected \"" + pickedPlayerName + "\" as \"" + gameClass + "\".")
+        assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[pickedPlayerName])
         # Debug : 9
         if captainStage < 9:
             captainStage += 1
             printCaptainChoices()
         else:
-            printTeams()
             state = 'idle'
+            printTeams()
+            initServer()
             sendStartPrivateMessages()
     else:
-        send("NOTICE " + userName + " : It is not your turn, or you are not authorized to pick a player") 
+        send("NOTICE " + userName + " : It is not your turn, or you are not authorized to pick a player.") 
 
 def players(userName):
     if isCaptain(userName) or isAdmin(userName):
@@ -653,6 +705,9 @@ def printUserList():
         printTimer = threading.Timer(5, printUserList)
         printTimer.start()
 
+def prototype():
+    initServer()
+
 def rate(userName, userCommand):
     global userInfo
     #Validation of the user vote.
@@ -706,23 +761,24 @@ def ratings(userName):
         intermediatePlayers = []
         advancedPlayers = []
         expertPlayers = []
-        for user in userList.copy():
-            if userList[user]['rating'] >= 0:
-                rating = userList[user]['rating']
+        userListCopy = userList.copy()
+        for user in userListCopy:
+            if userListCopy[user]['rating'] >= 0:
+                rating = userListCopy[user]['rating']
             else:
-                rating = getUserRating(userList[user]['nick'])
-            userList[user]['rating'] = rating
+                rating = getUserRating(userListCopy[user]['nick'])
+            userListCopy[user]['rating'] = rating
             if rating >= 0:
                 if rating == 3:
-                    expertPlayers.append('(' + str(getPlayerNumber(userList[user]['nick'])) + ')' + userList[user]['nick'])
+                    expertPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
                 elif rating == 2:
-                    advancedPlayers.append('(' + str(getPlayerNumber(userList[user]['nick'])) + ')' + userList[user]['nick'])
+                    advancedPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
                 elif rating == 1:
-                    intermediatePlayers.append('(' + str(getPlayerNumber(userList[user]['nick'])) + ')' + userList[user]['nick'])
+                    intermediatePlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
                 else:
-                    beginnerPlayers.append('(' + str(getPlayerNumber(userList[user]['nick'])) + ')' + userList[user]['nick'])
+                    beginnerPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
             else:
-                notRatedPlayers.append('(' + str(getPlayerNumber(userList[user]['nick'])) + ')' + userList[user]['nick'])
+                notRatedPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
         if len(expertPlayers):
             send("PRIVMSG " + channel + " :\x030,01Expert players : " + ", ".join(expertPlayers))
         if len(advancedPlayers):
@@ -751,6 +807,7 @@ def replace(userName, userCommand):
         for user in team:
             if user['nick'] == toReplace:
                 toReplace = user
+                toReplaceTeam = teamName
                 break
             counter += 1
     if type(toReplace) == type({}):
@@ -761,12 +818,14 @@ def replace(userName, userCommand):
         return 0
     if substitute in userList:
         userList[substitute]['status'] = 'captain'
-        assignUserToTeam(gameClass[0], 0, teamName, userList[substitute])
+        assignUserToTeam('medic', 0, toReplaceTeam, userList[substitute])
         team[counter]['status'] = ''
         userList[team[counter]['nick']] = team[counter]
         del team[counter]
+        print teamA
+        print teamB
     else:
-        send("NOTICE " + userName + " : Error, the substitute you specified is not in subscribed list.")
+        send("NOTICE " + userName + " : Error, the substitute you specified is not in the subscribed list.")
     return 0
 
 def remove(userName):
@@ -822,7 +881,7 @@ def saveRating(votedWhoisData, voterWhoisData, vote):
             cursor.execute('INSERT INTO votes VALUES (?, ?, ?, ?)', queryData)
     connection.commit()
 
-def send(message, delay = 1):
+def send(message, delay = 1.5):
     global nextAvailableTimeSpot
     # Flood protection.
     actualTime = time.time()
@@ -844,6 +903,10 @@ def sendStartPrivateMessages():
         teamCounter += 1
     return 0
 
+def setStartMode(mode):
+    global startMode
+    startMode = mode
+
 def sub(userName, userCommand):
     global subList
     commandList = string.split(userCommand)
@@ -858,6 +921,13 @@ def sub(userName, userCommand):
     send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
     del(subList[subIndex])
     return 0
+
+def updateLast(ip, port, last):
+    global gameServer, serverList
+    for i in range(0, len(serverList)):
+        if (ip == serverList[i]['ip'] or ip == serverList[i]['dns']) and port == serverList[i]['port']:
+            serverList[i]['last'] = last
+            return 0
 
 def welcome(connection, event):
     server.send_raw("authserv auth " + nick + " password")
@@ -914,7 +984,7 @@ channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["!addgame", "!endgame", "!flood", "!needsub", "!rate", "!replace", "!restart"]
+adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
 allowFriends = 1
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
@@ -927,18 +997,20 @@ initTimer = threading.Timer(0, None)
 lastCommand = ""
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
+mapList = ["cp_badlands", "cp_freight", "cp_granary"]
 minuteTimer = time.time()
 nextAvailableTimeSpot = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
 printTimer = threading.Timer(0, None)
+startMode = 'automatic'
 state = 'idle'
 teamA = []
 teamB = []
 restart = 0
-serverList = ['72.14.177.61', '97.107.136.68']
+serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!ip", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!ip", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
 userAuth = []
 userChannel = []
 userInfo = []
@@ -961,7 +1033,7 @@ irc.add_global_handler('dcc_disconnect', drop)
 irc.add_global_handler('disconnect', drop)
 irc.add_global_handler('endofwhois', whoisend)
 irc.add_global_handler('kick', drop)
-irc.add_global_handler('nick', nickChange)
+irc.add_global_handler('nick', nickchange)
 irc.add_global_handler('part', drop)
 irc.add_global_handler('privmsg', privmsg)
 irc.add_global_handler('pubmsg', pubmsg)
@@ -981,5 +1053,6 @@ while not restart:
         minuteTimer = time.time()
         checkConnection()
         printSubs()
+        autoGameStart()
 
 connectTimer.cancel()

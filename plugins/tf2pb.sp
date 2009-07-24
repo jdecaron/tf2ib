@@ -1,6 +1,8 @@
 #include <socket>
 #include <sourcemod>
 
+new tournamentState = 0;
+
 public Plugin:myinfo =
 {
 	name = "TF2PB",
@@ -39,8 +41,61 @@ public Action:Command_Say(client, args)
 	return Plugin_Continue;	
 }
 
+public Event_TeamplayGameOver(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    tournamentState = 0;
+    decl String:ip[64];
+    decl String:port[10];
+    decl String:query[192];
+    query = "";
+    GetConVarString(FindConVar("ip"), ip, sizeof(ip));
+    IntToString(GetConVarInt(FindConVar("hostport")), port, 10)
+    StrCat(query, 192, "!gameover");
+    StrCat(query, 192, " ");
+    StrCat(query, 192, ip);
+    StrCat(query, 192, ":");
+    StrCat(query, 192, port);
+    sendDataToBot(query);
+    PrintToChatAll("Game Over");
+    ServerCommand("exec tf2dm.cfg");
+}
+
+public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    PrintToChatAll("Round Restarted");
+    tournamentState = 0;
+}
+
+public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    if(GetEventBool(event, "namechange") == false)
+    {
+        if(GetEventInt(event, "readystate") == 1)
+        {
+            tournamentState = tournamentState + 1;
+            if(tournamentState >= 2)
+            {
+                PrintToChatAll("Match.cfg");
+                ServerCommand("exec match.cfg");
+            }
+        }else{
+            tournamentState = tournamentState - 1;
+            PrintToChatAll("TF2DM.cfg");
+            ServerCommand("exec tf2dm.cfg");
+        }
+        decl String:tournamentStateString[10];
+        decl String:tournamentReadyState[10];
+        IntToString(tournamentState, tournamentStateString, 10)
+        IntToString(GetEventInt(event, "readystate"), tournamentReadyState, 10)
+        PrintToChatAll("Event state : %s, Tournament state : %s", tournamentReadyState, tournamentStateString);
+    }
+}
+
 public OnPluginStart()
 {
+    HookEvent("teamplay_game_over", Event_TeamplayGameOver);
+    HookEvent("teamplay_restart_round", Event_TeamplayRestartRound);
+    HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
     RegConsoleCmd("say", Command_Say);
 }
 
