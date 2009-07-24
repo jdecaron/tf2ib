@@ -623,7 +623,7 @@ def pick(userName, userCommand):
         send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses()))
         return 0
     if isAuthorizedCaptain(userName):
-        send("NOTICE " + userName + " : You selected \"" + userList[commandList[0]] + "\" as \"" + gameClass + "\".")
+        send("NOTICE " + userName + " : You selected \"" + commandList[0] + "\" as \"" + gameClass + "\".")
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
         # Debug : 9
         if captainStage < 9:
