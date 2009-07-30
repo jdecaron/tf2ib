@@ -5,8 +5,8 @@ new String:serverIP[64];
 new disconnectedPlayers[32][2];
 new lastTournamentStateUpdate = 0;
 new String:port[16];
+new roundRestartCounter = 0;
 new String:server[16] = "dallas"; 
-new tournamentState = 0;
 
 public Plugin:myinfo =
 {
@@ -45,12 +45,10 @@ public Action:Command_Say(client, args)
 
 public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
 {
-    PrintToChatAll("%i", GetEventInt(event, "userid"));
     new appendedValue = 0;
     new disconnectedCounter = 0;
     for(new i = 0; i < 32; i++)
     {
-        PrintToServer("tttteeest");
         if(GetTime() - disconnectedPlayers[i][1] <= 1 * 60)
         {
             disconnectedCounter++;
@@ -69,8 +67,7 @@ public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadc
         }
     }
 
-    PrintToServer("disconnectedCounter %i", disconnectedCounter);
-    if(disconnectedCounter >= 2)
+    if(disconnectedCounter == 6)
     {
         gameOver();
     }
@@ -83,54 +80,42 @@ public Event_TeamplayGameOver(Handle:event, const String:name[], bool:dontBroadc
 
 public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBroadcast)
 {
-    if((GetTime() - lastTournamentStateUpdate) <= 10)
+    if(roundRestartCounter <= 0)
     {
-        decl String:record[64] = "tv_record ";
-        decl String:time[64];
-        FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
-        StrCat(record, 64, time);
-        StrCat(record, 64, "_");
-        StrCat(record, 64, server);
-        StrCat(record, 64, port);
-        ServerCommand("tv_stoprecord");
-        ServerCommand(record);
-        PrintToChatAll("%s", record);
+        PrintToChatAll("Match.cfg");
+        ServerCommand("exec match.cfg");
+        ServerCommand("mp_tournament_restart 1");
+        PrintToChatAll("Match will be live at the next ready state!");
     }
-    PrintToChatAll("Round Restarted");
-    tournamentState = 0;
+    else
+    {
+        if((GetTime() - lastTournamentStateUpdate) <= 10)
+        {
+            decl String:record[64] = "tv_record ";
+            decl String:time[64];
+            FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
+            StrCat(record, 64, time);
+            StrCat(record, 64, "_");
+            StrCat(record, 64, server);
+            StrCat(record, 64, port);
+            ServerCommand("tv_stoprecord");
+            ServerCommand(record);
+            PrintToChatAll("%s", record);
+        }
+        PrintToChatAll("Live!");
+    }
+    roundRestartCounter++;
 }
 
 public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontBroadcast)
 {
-
-    if(GetEventBool(event, "namechange") == false)
-    {
-        if(GetEventInt(event, "readystate") == 1)
-        {
-            tournamentState = tournamentState + 1;
-            if(tournamentState >= 2)
-            {
-                lastTournamentStateUpdate = GetTime();
-                PrintToChatAll("Match.cfg");
-                ServerCommand("exec match.cfg");
-            }
-        }else{
-            tournamentState = tournamentState - 1;
-            PrintToChatAll("TF2DM.cfg");
-            ServerCommand("exec tf2dm.cfg");
-        }
-        decl String:tournamentStateString[10];
-        decl String:tournamentReadyState[10];
-        IntToString(tournamentState, tournamentStateString, 10)
-        IntToString(GetEventInt(event, "readystate"), tournamentReadyState, 10)
-        PrintToChatAll("Event state : %s, Tournament state : %s", tournamentReadyState, tournamentStateString);
-    }
+    lastTournamentStateUpdate = GetTime();
 }
 
 public gameOver()
 {
+    roundRestartCounter = 0;
     ServerCommand("tv_stoprecord");
-    tournamentState = 0;
     decl String:query[192];
     query = "";
     StrCat(query, 192, "!gameover");
@@ -148,6 +133,7 @@ public OnPluginStart()
     GetConVarString(FindConVar("ip"), serverIP, sizeof(serverIP));
     IntToString(GetConVarInt(FindConVar("hostport")), port, 10)
     lastTournamentStateUpdate = 0;
+    roundRestartCounter = 0;
 
     for(new i = 32; i < 32; i++)
     {
