@@ -5,7 +5,6 @@ new String:serverIP[64];
 new disconnectedPlayers[32][2];
 new lastTournamentStateUpdate = 0;
 new String:port[16];
-new roundRestartCounter = 0;
 new String:server[16] = "dallas"; 
 
 public Plugin:myinfo =
@@ -80,41 +79,40 @@ public Event_TeamplayGameOver(Handle:event, const String:name[], bool:dontBroadc
 
 public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBroadcast)
 {
-    if(roundRestartCounter <= 0)
+    if((GetTime() - lastTournamentStateUpdate) <= 10)
     {
-        PrintToChatAll("Match.cfg");
-        ServerCommand("exec match.cfg");
-        ServerCommand("mp_tournament_restart 1");
-        PrintToChatAll("Match will be live at the next ready state!");
-    }
-    else
-    {
-        if((GetTime() - lastTournamentStateUpdate) <= 10)
-        {
-            decl String:record[64] = "tv_record ";
-            decl String:time[64];
-            FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
-            StrCat(record, 64, time);
-            StrCat(record, 64, "_");
-            StrCat(record, 64, server);
-            StrCat(record, 64, port);
-            ServerCommand("tv_stoprecord");
-            ServerCommand(record);
-            PrintToChatAll("%s", record);
-        }
+        decl String:record[64] = "tv_record ";
+        decl String:time[64];
+        FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
+        StrCat(record, 64, time);
+        StrCat(record, 64, "_");
+        StrCat(record, 64, server);
+        StrCat(record, 64, port);
+        ServerCommand("tv_stoprecord");
+        ServerCommand(record);
+        PrintToChatAll("%s", record);
         PrintToChatAll("Live!");
     }
-    roundRestartCounter++;
+}
+
+public Event_TeamplayRestartSeconds(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    PrintToChatAll("Match.cfg");
+    ServerCommand("exec match.cfg");
 }
 
 public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontBroadcast)
 {
+    if(GetEventInt(event, "readystate") == 0)
+    {
+        PrintToChatAll("DM");
+        ServerCommand("exec tf2dm.cfg");
+    }
     lastTournamentStateUpdate = GetTime();
 }
 
 public gameOver()
 {
-    roundRestartCounter = 0;
     ServerCommand("tv_stoprecord");
     decl String:query[192];
     query = "";
@@ -133,7 +131,6 @@ public OnPluginStart()
     GetConVarString(FindConVar("ip"), serverIP, sizeof(serverIP));
     IntToString(GetConVarInt(FindConVar("hostport")), port, 10)
     lastTournamentStateUpdate = 0;
-    roundRestartCounter = 0;
 
     for(new i = 32; i < 32; i++)
     {
@@ -144,6 +141,7 @@ public OnPluginStart()
     HookEvent("player_disconnect", Event_PlayerDisconnect);
     HookEvent("teamplay_game_over", Event_TeamplayGameOver);
     HookEvent("teamplay_restart_round", Event_TeamplayRestartRound);
+    HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
     HookEvent("tf_game_over", Event_TeamplayGameOver);
     HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
     RegConsoleCmd("say", Command_Say);
