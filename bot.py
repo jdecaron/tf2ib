@@ -529,22 +529,26 @@ def isUserCommand(userName, userCommand):
 def listeningTF2Servers():
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('', 50007))
-    listener.listen(5)
+    listener.settimeout(5)
+    listener.listen(1)
     while 1:
-        connection, address = listener.accept()
-        while 1:
+        try:
+            connection, address = listener.accept()
+        except:
+            listener.listen(1)
+            continue
+        try:
             data = connection.recv(4096)
-            print data
-            if data and address[0] in getServers():
-                if re.search('^!needsub', data):
-                    needsub('', data)
-                if re.search('^!gameover', data):
-                    print "^!gameover"
-                    print data
-                    server = string.split(data, ' ')[1]
-                    updateLast(string.split(server, ':')[0], string.split(server, ':')[1], 0)
-            else:
-                break
+        except:
+            continue
+        if data and address[0] in getServers():
+            if re.search('^!needsub', data):
+                needsub('', data)
+            if re.search('^!gameover', data):
+                print "^!gameover"
+                print data
+                server = string.split(data, ' ')[1]
+                updateLast(string.split(server, ':')[0], string.split(server, ':')[1], 0)
 
 def mumble():
     global voiceServer
