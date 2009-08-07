@@ -71,6 +71,7 @@ def analyseCommand(connection, event):
     global lastCommand
     userName = extractUserName(event.source())
     userCommand = event.arguments()[0]
+    userCommand = userCommand.replace('[', '')
     if re.match('^!', userCommand):
     # Check if the user is trying to pass a command to the bot.
         if isGamesurgeCommand(userCommand):
@@ -529,7 +530,6 @@ def isUserCommand(userName, userCommand):
 def listeningTF2Servers():
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('', 50007))
-    listener.settimeout(5)
     listener.listen(1)
     while 1:
         try:
@@ -589,6 +589,11 @@ def nickchange(connection, event):
 def notice(userName):
     send("NOTICE " + userName + " : Notice!!!!")
 
+def onWelcome():
+    server.send_raw("authserv auth " + nick + " y8hdr517")
+    server.send_raw("MODE " + nick + " +x")
+    server.join(channel)
+
 def pick(userName, userCommand):
     global captainStage, classList, state, teamA, teamB, userList
     if not len(teamA) or not len(teamB):
@@ -645,10 +650,6 @@ def players(userName):
     if isCaptain(userName) or isAdmin(userName):
         printCaptainChoices('channel')
 
-def privmsg(connection, event):
-    if not analyseCommand(connection, event):
-        send("PRIVMSG " + extractUserName(event.source()) + " :Type \"!man\" for usage commands. Otherwise, don't ask me anything that I can't answer, I'm just a PUG bot.")
-
 def pubmsg(connection, event):
     analyseCommand(connection, event)
 
@@ -699,7 +700,6 @@ def printTeams():
 def printUserList():
     global lastUserPrint, printTimer, state, userList
     if (time.time() - lastUserPrint) > 5:
-        lastUserPrint = time.time()
         message = "\x030,01" + str(len(userList)) + " users subscribed :"
         for i, user in userList.copy().iteritems():
             message += ' "' + user['nick'] + '"'
@@ -708,9 +708,7 @@ def printUserList():
         printTimer.cancel()
         printTimer = threading.Timer(5, printUserList)
         printTimer.start()
-
-def prototype():
-    initServer()
+    lastUserPrint = time.time()
 
 def rate(userName, userCommand):
     global userInfo
@@ -1039,7 +1037,6 @@ irc.add_global_handler('endofwhois', whoisend)
 irc.add_global_handler('kick', drop)
 irc.add_global_handler('nick', nickchange)
 irc.add_global_handler('part', drop)
-irc.add_global_handler('privmsg', privmsg)
 irc.add_global_handler('pubmsg', pubmsg)
 irc.add_global_handler('quit', drop)
 irc.add_global_handler('welcome', welcome)
