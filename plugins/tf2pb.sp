@@ -2,6 +2,7 @@
 #include <sourcemod>
 
 new String:serverIP[64];
+new String:data[192];
 new disconnectedPlayers[32][2];
 new lastTournamentStateUpdate = 0;
 new String:port[16];
@@ -122,6 +123,7 @@ public gameOver()
     StrCat(query, 192, ":");
     StrCat(query, 192, port);
     sendDataToBot(query);
+    PrintToChatAll("%s", query);
     PrintToChatAll("TF2 Game Over");
     ServerCommand("exec tf2dm.cfg");
 }
@@ -147,10 +149,8 @@ public OnPluginStart()
     RegConsoleCmd("say", Command_Say);
 }
 
-public OnSocketConnected(Handle:socket, any:data){
-    decl String:query[192];
-    GetArrayString(data, 0, query, 192);
-    SocketSend(socket, query);
+public OnSocketConnected(Handle:socket, any:arg){
+    SocketSend(socket, data);
 }
 
 public OnSocketDisconnected(Handle:socket, any:arg){
@@ -173,9 +173,6 @@ public OnSocketSendqueueEmpty(Handle:socket, any:arg){
 public sendDataToBot(String:query[])
 {
     new Handle:socket = SocketCreate(SOCKET_TCP, OnSocketError);
-    new Handle:data = CreateArray(192);
-    PushArrayString(data, query);
-    SocketSetArg(socket, data);
-    SocketSetSendqueueEmptyCallback(socket, OnSocketSendqueueEmpty);
+    Format(data, sizeof(data), "%s", query);
     SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "bot.tf2pug.org", 50007)
 }
