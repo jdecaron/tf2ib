@@ -34,7 +34,7 @@ def add(userName, userCommand):
             # Debug : 12
             if len(userList) == 12:
                 initGame()
-        elif state == 'picking':
+        elif state == 'picking' and not isUserCountOverLimit():
             if isInATeam(userName):
                 return 0
             userList[userName] = createUser(userName, userCommand)
@@ -181,9 +181,11 @@ def connect():
 def createUser(userName, userCommand):
     global classList, state
     commandList = string.split(userCommand, ' ')
-    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'nick':'', 'rating':-1, 'status':'', 'team':''}
+    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'late':0, 'nick':'', 'rating':-1, 'status':'', 'team':''}
     user['command'] = userCommand
     user['id'] = getNextPlayerID()
+    if (getUserCount() + 1) > 12:
+        user['late'] = 1
     classes = extractClasses(userCommand)
     if state != 'normal' or 'medic' in classes:
         user['class'] = classes
@@ -231,8 +233,8 @@ def executeCommand(userName, userCommand):
     if re.search('^!ip', userCommand):
         ip()
         return 0
-    if re.search('^!needsub', userCommand):
-        needsub(userName, userCommand)
+    if re.search('^!limit', userCommand):
+        limit(userName, userCommand)
         return 0
     if re.search('^!man$', userCommand):
         help()
@@ -242,6 +244,9 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('^!mumble', userCommand):
         mumble()
+        return 0
+    if re.search('^!needsub', userCommand):
+        needsub(userName, userCommand)
         return 0
     if re.search('^!notice', userCommand):
         notice(userName)
@@ -416,6 +421,17 @@ def getTeam(team):
     else:
         return teamB
 
+def getUserCount():
+    global teamA, teamB, userList
+    teams = [teamA, teamB]
+    counter = len(userList)
+    teamCounter = 0
+    for team in teams:
+        for user in teams[teamCounter]:
+            counter += 1
+        teamCounter += 1
+    return counter
+
 def getUserRating(userName):
     whoisData = whois(userName)
     if not len(whoisData):
@@ -466,6 +482,15 @@ def isCaptain(userName):
                 return 1
     return 0
 
+def isUserCountOverLimit():
+    global teamA, teamB, userLimit, userList
+    teams = [teamA, teamB]
+    userCount = getUserCount()
+    if userCount < userLimit:
+        return 0
+    else:
+        return 1
+
 def isGamesurgeCommand(userCommand):
     global gamesurgeCommands
     for command in gamesurgeCommands:
@@ -493,11 +518,12 @@ def initGame():
         # Debug : 20
         initTimer = threading.Timer(20, assignCaptains)
         initTimer.start()
+        ratings('', 1)
 
 def initServer():
     global gameServer
     print int(string.split(gameServer, ':')[1])
-    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), 'pornstar', 10)
+    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), 'password', 10)
     TF2Server.rcon_command('changelevel ' + getMap())
     updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
@@ -527,6 +553,23 @@ def isUserCommand(userName, userCommand):
     send("NOTICE " + userName + " : Invalid command : \"" + userCommand + "\". Type \"!man\" for usage commands.")
     return 0
 
+def limit(userName, userCommand):
+    global userLimit
+    commandList = string.split(userCommand, ' ')
+    if len(commandList) < 2:
+        send("PRIVMSG " + channel + " :\x030,01The PUG's user limit is set to \"" + str(userLimit) + "\".")
+        return 0
+    try:
+        if not isAdmin(userName):
+            send("PRIVMSG " + channel + " :\x030,01Warning " + userName + ", you are trying an admin command as a normal user.")
+            return 0
+        if int(commandList[1]) < 12:
+            send("NOTICE " + userName + " : The limit value must be equal or above 12.")
+            return 0
+    except:
+        return 0
+    userLimit = int(commandList[1])
+
 def listeningTF2Servers():
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('', 50007))
@@ -542,6 +585,7 @@ def listeningTF2Servers():
         except:
             continue
         if data and address[0] in getServers():
+            print data
             if re.search('^!needsub', data):
                 needsub('', data)
             if re.search('^!gameover', data):
@@ -558,11 +602,15 @@ def mumble():
 def needsub(userName, userCommand):
     global classList, subList
     commandList = string.split(userCommand, ' ')
-    sub = {'class':'unspecified', 'id':getNextSubID(), 'server':'', 'team':'unspecified'}
-    # Set the server IP.
-    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
-        sub['server'] = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
-    else:
+    sub = {'class':'unspecified', 'id':getNextSubID(), 'server':'', 'steamid':'', 'team':'unspecified'}
+    for command in commandList:
+        # Set the server IP.
+        if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]$", command):
+            sub['server'] = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", command)[0]
+        # Set the Steam ID.
+        if re.search("STEAM", command):
+            sub['steamid'] = command
+    if sub['server'] == '':
         send("NOTICE " + userName + " : You must set a server IP. Here is an example : \"!needsub 127.0.0.1:27015\".")
         return 0
     # Set the team.
@@ -588,11 +636,6 @@ def nickchange(connection, event):
 
 def notice(userName):
     send("NOTICE " + userName + " : Notice!!!!")
-
-def onWelcome():
-    server.send_raw("authserv auth " + nick + " y8hdr517")
-    server.send_raw("MODE " + nick + " +x")
-    server.join(channel)
 
 def pick(userName, userCommand):
     global captainStage, classList, state, teamA, teamB, userList
@@ -666,20 +709,30 @@ def printCaptainChoices(printType = 'private'):
         choiceList = []
         for userName in userList.copy():
             if gameClass in userList[userName]['class']:
-                choiceList.append("(" + str(getPlayerNumber(userName)) + ")" + userName)
+                late = ''
+                if userList[userName]['late'] == 1:
+                    late = 'L'
+                choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
         if len(choiceList):
             send(dataPrefix + gameClass.capitalize() + "s: " + ', '.join(choiceList)) 
     choiceList = []
     for userName in userList.copy():
-        choiceList.append("(" + str(getPlayerNumber(userName)) + ")" + userName)
+        late = ''
+        if userList[userName]['late'] == 1:
+            late = 'L'
+        choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
     send(dataPrefix + "All players : " + ', '.join(choiceList)) 
 
 def printSubs():
     global subList
+    print subList
     if len(subList):
         send("PRIVMSG " + channel + " :" + "\x030,01Substitute(s) needed:")
         for sub in subList:
-            send("PRIVMSG " + channel + " :" + "\x030,01ID = \"" + str(sub['id']) + "\", Class = \"" + sub['class'].capitalize() + "\", Server = \"" + sub['server'] + "\", Team = \"" + sub['team'] + "\"")
+            by = ''
+            if sub['steamid'] != '':
+                by = ", User = \"" + sub['steamid'] + "\""
+            send("PRIVMSG " + channel + " :" + "\x030,01ID = \"" + str(sub['id']) + "\", Class = \"" + sub['class'].capitalize() + "\", Server = \"" + sub['server'] + "\", Team = \"" + sub['team'] + "\"" + by)
 
 def printTeams():
     global teamA, teamB
@@ -709,6 +762,10 @@ def printUserList():
         printTimer = threading.Timer(5, printUserList)
         printTimer.start()
     lastUserPrint = time.time()
+
+def prototype():
+    global userList
+    print userList
 
 def rate(userName, userCommand):
     global userInfo
@@ -755,9 +812,9 @@ def rating(userName, userCommand):
         ratingDescriptions = ['beginner', 'intermediate', 'advanced', 'expert']
         send("PRIVMSG " + channel + " :\x030,01The user \"" + commandList[1] + "\" is rated " + ratingDescriptions[userRating] + ".")
 
-def ratings(userName):
+def ratings(userName, skipUserValidation = 0):
     global userList
-    if isCaptain(userName) or isAdmin(userName):
+    if skipUserValidation or isCaptain(userName) or isAdmin(userName):
         notRatedPlayers = []
         beginnerPlayers = []
         intermediatePlayers = []
@@ -844,7 +901,7 @@ def resetUserVariables():
     userInfo = []
 
 def resetVariables():
-    global allowFriends, captainStage, gameServer, teamA, teamB, userList
+    global allowFriends, captainStage, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
     gameServer = ''
@@ -1012,10 +1069,11 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!ip", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
 userAuth = []
 userChannel = []
 userInfo = []
+userLimit = 13
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0

@@ -2,7 +2,7 @@
 #include <sourcemod>
 
 new String:serverIP[64];
-new String:data[192];
+new String:socketData[192];
 new disconnectedPlayers[32][2];
 new lastTournamentStateUpdate = 0;
 new String:port[16];
@@ -16,32 +16,6 @@ public Plugin:myinfo =
 	version = SOURCEMOD_VERSION,
 	url = "http://github.com/550/tf2pb/"
 };
-
-public Action:Command_Say(client, args)
-{
-	decl String:userText[192];
-    userText[0] = '\0';
-	if (!GetCmdArgString(userText, sizeof(userText)))
-	{
-		return Plugin_Continue;
-	}
-
-    if(StrContains(userText, "\"!needsub") == 0)
-    { 
-        decl String:query[192];
-        query = "";
-        StripQuotes(userText);
-        StrCat(query, 192, userText);
-        StrCat(query, 192, " ");
-        StrCat(query, 192, serverIP);
-        StrCat(query, 192, ":");
-        StrCat(query, 192, port);
-        sendDataToBot(query);
-    }
-	
-	return Plugin_Continue;	
-}
-
 
 public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -71,6 +45,36 @@ public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadc
     {
         gameOver();
     }
+}
+
+public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	decl String:userText[192];
+    userText[0] = '\0';
+	if (!GetEventString(event, "text", userText, 192))
+	{
+		return Plugin_Continue;
+	}
+
+    decl String:steamID[192];
+    GetClientAuthString(GetClientOfUserId(GetEventInt(event, "userid")), steamID, 192);
+
+    if(StrContains(userText, "!needsub") == 0)
+    { 
+        decl String:query[192];
+        query = "";
+        StripQuotes(userText);
+        StrCat(query, 192, userText);
+        StrCat(query, 192, " ");
+        StrCat(query, 192, serverIP);
+        StrCat(query, 192, ":");
+        StrCat(query, 192, port);
+        StrCat(query, 192, " ");
+        StrCat(query, 192, steamID);
+        sendDataToBot(query);
+    }
+	
+	return Plugin_Continue;	
 }
 
 public Event_TeamplayGameOver(Handle:event, const String:name[], bool:dontBroadcast)
@@ -141,16 +145,16 @@ public OnPluginStart()
     }
 
     HookEvent("player_disconnect", Event_PlayerDisconnect);
+    HookEvent("player_say", Event_PlayerSay);
     HookEvent("teamplay_game_over", Event_TeamplayGameOver);
     HookEvent("teamplay_restart_round", Event_TeamplayRestartRound);
     HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
     HookEvent("tf_game_over", Event_TeamplayGameOver);
     HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
-    RegConsoleCmd("say", Command_Say);
 }
 
 public OnSocketConnected(Handle:socket, any:arg){
-    SocketSend(socket, data);
+    SocketSend(socket, socketData);
 }
 
 public OnSocketDisconnected(Handle:socket, any:arg){
@@ -173,6 +177,6 @@ public OnSocketSendqueueEmpty(Handle:socket, any:arg){
 public sendDataToBot(String:query[])
 {
     new Handle:socket = SocketCreate(SOCKET_TCP, OnSocketError);
-    Format(data, sizeof(data), "%s", query);
+    Format(socketData, sizeof(socketData), "%s", query);
     SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "bot.tf2pug.org", 50007)
 }
