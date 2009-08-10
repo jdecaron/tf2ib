@@ -70,8 +70,7 @@ def addGame(userName, userCommand):
 def analyseCommand(connection, event):
     global lastCommand
     userName = extractUserName(event.source())
-    userCommand = event.arguments()[0]
-    userCommand = userCommand.replace('[', '')
+    userCommand = cleanUserCommand(event.arguments()[0])
     if re.match('^!', userCommand):
     # Check if the user is trying to pass a command to the bot.
         if isGamesurgeCommand(userCommand):
@@ -173,6 +172,12 @@ def classCount(gameClass):
             if userClass == gameClass:
                 counter += 1
     return counter            
+
+def cleanUserCommand(command):
+    command = command.replace('[', '')
+    command = command.replace('(', '')
+    command = command.replace(')', '')
+    return command
 
 def connect():
     global connectTimer, network, nick, name, port, server
