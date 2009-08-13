@@ -526,9 +526,9 @@ def initGame():
         ratings('', 1)
 
 def initServer():
-    global gameServer
+    global gameServer, rconPassword
     print int(string.split(gameServer, ':')[1])
-    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), 'password', 10)
+    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
     TF2Server.rcon_command('changelevel ' + getMap())
     updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
@@ -791,7 +791,7 @@ def rate(userName, userCommand):
             send("PRIVMSG " + userName + " :Error, the second argument of your \"!vote\" command must be a number of 0 to 3.")
             return 0
     else:
-        send("PRIVMSG " + userName + " :Your vote can't be registered, you don't have the right number of arguments in yout command. Here is an example of a correct vote command: \"!vote nickname 10\".")
+        send("PRIVMSG " + userName + " :Your vote can't be registered, you don't have the right number of arguments in yout command. Here is an example of a correct vote command: \"!vote nickname 3\".")
         return 0
     if len(votedWhoisData['info']) > 0:
         voterWhoisData = whois(userName)
@@ -853,6 +853,16 @@ def ratings(userName, skipUserValidation = 0):
             send("PRIVMSG " + channel + " :\x030,01Beginner players : " + ", ".join(beginnerPlayers))
         if len(notRatedPlayers):
             send("PRIVMSG " + channel + " :\x030,01Not rated players : " + ", ".join(notRatedPlayers))
+
+def readPasswords():
+    global authPassword, rconPassword
+    passwordFile = open("passwords.txt")
+    try:
+        passwords = passwordFile.readline().replace('\n', '').split(':')
+        authPassword = passwords[0]
+        rconPassword = passwords[1]
+    finally:
+        passwordFile.close()
 
 def replace(userName, userCommand):
     global userList
@@ -994,7 +1004,8 @@ def updateLast(ip, port, last):
             return 0
 
 def welcome(connection, event):
-    server.send_raw("authserv auth " + nick + " password")
+    global authPassword
+    server.send_raw("authserv auth " + nick + " " + authPassword)
     server.send_raw("MODE " + nick + " +x")
     server.join(channel)
 
@@ -1050,6 +1061,7 @@ name = 'BOT'
 
 adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
 allowFriends = 1
+authPassword = ''
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
@@ -1067,6 +1079,7 @@ nextAvailableTimeSpot = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
 printTimer = threading.Timer(0, None)
+rconPassword = ''
 startMode = 'automatic'
 state = 'idle'
 teamA = []
@@ -1084,6 +1097,7 @@ voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
 
 #CREATE TABLE votes (votedIP varchar(255), votedAuth varchar(255), voterIP varchar(255), vote int)
+readPasswords()
 connection = sqlite3.connect('./tf2pb.sqlite')
 cursor = connection.cursor()
 
