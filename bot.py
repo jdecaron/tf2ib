@@ -337,6 +337,9 @@ def game(userName, userCommand):
     if len(mode) <= 1:
         send("PRIVMSG " + channel + " :\x030,01The actual game mode is set to \"" + state + "\".")
         return 0
+    elif not isCaptain(userName):
+        send("PRIVMSG " + channel + " :\x030,01Warning " + userName + ", you are trying an admin command as a normal user.")
+        return 0
     if mode[1] == 'captain':
         if state == 'scrim':
             captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
@@ -1106,7 +1109,7 @@ channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["!addgame", "!automatic", "!endgame", "!game", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
+adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
 allowFriends = 1
 authPassword = ''
 captainStage = 0
@@ -1134,7 +1137,7 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!game", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
 userAuth = []
 userChannel = []
 userInfo = []
