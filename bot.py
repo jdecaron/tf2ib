@@ -34,6 +34,16 @@ def add(userName, userCommand):
             # Debug : 12
             if len(userList) == 12:
                 initGame()
+        elif state == 'scrim':
+            if len(userList) == 5 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE):
+                send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
+                return 0
+            if len(userList) < 6:
+                print "User add : " + userName + "  Command : " + userCommand
+                userList[userName] = createUser(userName, userCommand)
+                printUserList()
+            if len(userList) == 6:
+                initGame()
         elif state == 'picking' and not isUserCountOverLimit():
             if isInATeam(userName):
                 return 0
@@ -93,14 +103,19 @@ def analyseCommand(connection, event):
                 return 1
     return 0
 
-def assignCaptains():
-        global teamA, teamB
+def assignCaptains(mode = 'captain'):
+    global teamA, teamB
+    if mode == 'captain':
         assignUserToTeam('medic', 0, 'a', userList[getAPlayer('medic')])
         assignUserToTeam('medic', 0, 'b', userList[getAPlayer('medic')])
         teamA[0]['status'] = 'captain'
         teamB[0]['status'] = 'captain'
         send("PRIVMSG " + channel + ' :\x030,01Captains are \x0311,01' + teamA[0]['nick'] + '\x030,01 and \x034,01' + teamB[0]['nick'] + "\x030,01.")
-        printCaptainChoices()
+    elif mode == 'scrim':
+        assignUserToTeam('medic', 0, 'a', userList[getAPlayer('medic')])
+        teamA[0]['status'] = 'captain'
+        send("PRIVMSG " + channel + ' :\x030,01Captain is \x0308,01' + teamA[0]['nick'] + '\x030,01.')
+    printCaptainChoices()
 
 def assignUserToTeam(gameClass, recursiveFriend, team, user):
     global allowFriends, teamA, teamB, userList
@@ -235,6 +250,9 @@ def executeCommand(userName, userCommand):
     if re.search('^!endgame', userCommand):
         endGame()
         return 0
+    if re.search('^!game', userCommand):
+        game(userName, userCommand)
+        return 0
     if re.search('^!ip', userCommand):
         ip()
         return 0
@@ -312,6 +330,25 @@ def firstChoiceMedic(user):
     if counter == 0:
         return 1
     return 0
+
+def game(userName, userCommand):
+    global captainStageList, state
+    mode = userCommand.split(' ')
+    if len(mode) <= 1:
+        send("PRIVMSG " + channel + " :\x030,01The actual game mode is set to \"" + state + "\".")
+        return 0
+    if mode[1] == 'captain':
+        if state == 'scrim':
+            captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+            state = 'captain'
+        else:
+            send("NOTICE " + userName + " :You can't switch the game mode in this bot state.")
+    elif mode[1] == 'scrim':
+        if state == 'captain':
+            captainStageList = ['a', 'a', 'a', 'a', 'a'] 
+            state = 'scrim'
+        else:
+            send("NOTICE " + userName + " :You can't switch the game mode in this bot state.")
 
 def getAPlayer(gameClass):
     global userList
@@ -514,23 +551,27 @@ def initGame():
     print "Init game."
     if state == "normal":
         state = 'building'
-        # Debug : 20
         initTimer = threading.Timer(20, buildTeams)
         initTimer.start()
     elif state == "captain":
         send("PRIVMSG " + channel + " :\x030,01Teams are being drafted, please wait in the channel until this process's over.")
         state = 'picking'
-        # Debug : 20
-        initTimer = threading.Timer(20, assignCaptains)
+        initTimer = threading.Timer(20, assignCaptains, ['captain'])
+        initTimer.start()
+        ratings('', 1)
+    elif state == "scrim":
+        send("PRIVMSG " + channel + " :\x030,01Team is being drafted, please wait in the channel until this process's over.")
+        state = 'picking'
+        initTimer = threading.Timer(20, assignCaptains, ['scrim'])
         initTimer.start()
         ratings('', 1)
 
 def initServer():
     global gameServer, rconPassword
     print int(string.split(gameServer, ':')[1])
-    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
+    """TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
     TF2Server.rcon_command('changelevel ' + getMap())
-    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
+    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())"""
 
 def isAdminCommand(userName, userCommand):
     global adminCommands
@@ -643,8 +684,8 @@ def notice(userName):
     send("NOTICE " + userName + " : Notice!!!!")
 
 def pick(userName, userCommand):
-    global captainStage, classList, state, teamA, teamB, userList
-    if not len(teamA) or not len(teamB):
+    global captainStage, captainStageList, classList, state, teamA, teamB, userList
+    if (len(captainStageList) >= 10 and (not len(teamA) or not len(teamB))) or (len(captainStageList) == 5 and not len(teamA)):
         send("NOTICE " + userName + " : The selection is not started yet.") 
         return 0
     commandList = string.split(userCommand, ' ')
@@ -682,8 +723,8 @@ def pick(userName, userCommand):
     if isAuthorizedCaptain(userName):
         send("NOTICE " + userName + " : You selected \"" + commandList[0] + "\" as \"" + gameClass + "\".")
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
-        # Debug : 9
-        if captainStage < 9:
+        # Debug : (len(captainStageList) - 1)
+        if captainStage < (len(captainStageList) - 1):
             captainStage += 1
             printCaptainChoices()
         else:
@@ -740,10 +781,15 @@ def printSubs():
             send("PRIVMSG " + channel + " :" + "\x030,01ID = \"" + str(sub['id']) + "\", Class = \"" + sub['class'].capitalize() + "\", Server = \"" + sub['server'] + "\", Team = \"" + sub['team'] + "\"" + by)
 
 def printTeams():
-    global teamA, teamB
-    teamNames = ['Blue', 'Red']
-    colors = ['\x0311,01', '\x034,01']
-    teams = [teamA, teamB]
+    global state, teamA, teamB
+    if state == 'captain':
+        teamNames = ['Blue', 'Red']
+        colors = ['\x0311,01', '\x034,01']
+        teams = [teamA, teamB]
+    else:
+        teamNames = ['Scrim']
+        colors = ['\x0308,01']
+        teams = [teamA]
     counter = 0
     for i in teams:
         message = colors[counter] + teamNames[counter] + "\x030,01 : "
@@ -916,9 +962,10 @@ def resetUserVariables():
     userInfo = []
 
 def resetVariables():
-    global allowFriends, captainStage, gameServer, teamA, teamB, userLimit, userList
+    global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
+    captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
     gameServer = ''
     teamA = []
     teamB = []
@@ -1059,7 +1106,7 @@ channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
+adminCommands = ["!addgame", "!automatic", "!endgame", "!game", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
 allowFriends = 1
 authPassword = ''
 captainStage = 0
