@@ -337,7 +337,7 @@ def game(userName, userCommand):
     if len(mode) <= 1:
         send("PRIVMSG " + channel + " :\x030,01The actual game mode is set to \"" + state + "\".")
         return 0
-    elif not isCaptain(userName):
+    elif not isAdmin(userName):
         send("PRIVMSG " + channel + " :\x030,01Warning " + userName + ", you are trying an admin command as a normal user.")
         return 0
     if mode[1] == 'captain':
@@ -784,8 +784,8 @@ def printSubs():
             send("PRIVMSG " + channel + " :" + "\x030,01ID = \"" + str(sub['id']) + "\", Class = \"" + sub['class'].capitalize() + "\", Server = \"" + sub['server'] + "\", Team = \"" + sub['team'] + "\"" + by)
 
 def printTeams():
-    global state, teamA, teamB
-    if state == 'captain':
+    global captainStageList, state, teamA, teamB
+    if len(captainStageList) >= 10:
         teamNames = ['Blue', 'Red']
         colors = ['\x0311,01', '\x034,01']
         teams = [teamA, teamB]
