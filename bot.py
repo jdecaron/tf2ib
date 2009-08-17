@@ -150,7 +150,6 @@ def autoGameStart():
     server = getAvailableServer()
     if state == 'idle' and server and startMode == 'automatic':
         addGame(nick, '!addgame captain ' + server['ip'] + ':' + server['port'])
-        print serverList
 
 def buildTeams():
     global allowFriends, state, userList
@@ -571,10 +570,9 @@ def initGame():
 
 def initServer():
     global gameServer, rconPassword
-    print int(string.split(gameServer, ':')[1])
-    """TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
+    TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
     TF2Server.rcon_command('changelevel ' + getMap())
-    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())"""
+    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
 def isAdminCommand(userName, userCommand):
     global adminCommands
@@ -774,7 +772,6 @@ def printCaptainChoices(printType = 'private'):
 
 def printSubs():
     global subList
-    print subList
     if len(subList):
         send("PRIVMSG " + channel + " :" + "\x030,01Substitute(s) needed:")
         for sub in subList:
@@ -945,8 +942,6 @@ def replace(userName, userCommand):
         team[counter]['status'] = ''
         userList[team[counter]['nick']] = team[counter]
         del team[counter]
-        print teamA
-        print teamB
     else:
         send("NOTICE " + userName + " : Error, the substitute you specified is not in the subscribed list.")
     return 0
