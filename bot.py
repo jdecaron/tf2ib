@@ -4,7 +4,7 @@ import irclib
 import random
 import re
 import socket
-import sqlite3
+#import sqlite3
 import string
 import SRCDS
 import thread
@@ -19,11 +19,11 @@ def add(userName, userCommand):
     if state != 'idle':
         if state == 'captain' or state == 'normal':
             # Debug : 10
-            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE):
+            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE) and state == 'captain':
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                 return 0
             # Debug : 11
-            if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand, re.IGNORECASE):
+            if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand, re.IGNORECASE) and state == 'captain':
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join as this class.")
                 return 0
             # Debug : 12
@@ -62,7 +62,7 @@ def addFriend(userName, userCommand):
 
 def addGame(userName, userCommand):
     resetVariables()
-    global allowFriends, gameServer, state
+    global allowFriends, gameServer, lastGameType, state
     # Game server.
     if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
         gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
@@ -72,8 +72,10 @@ def addGame(userName, userCommand):
     # Game type.
     if re.search('captain', userCommand):
         allowFriends = 0
+        lastGameType = 'captain'
         state = 'captain'
     else:
+        lastGameType = 'normal'
         state = 'normal'
     send("PRIVMSG " + channel + ' :\x030,01PUG started. Game type : ' + state + '. Type "!add" to join a game.')
 
@@ -146,10 +148,10 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
     return 0
 
 def autoGameStart():
-    global nick, startMode, state
+    global lastGameType, nick, startMode, state
     server = getAvailableServer()
     if state == 'idle' and server and startMode == 'automatic':
-        addGame(nick, '!addgame captain ' + server['ip'] + ':' + server['port'])
+        addGame(nick, '!addgame ' + lastGameType + ' ' + server['ip'] + ':' + server['port'])
 
 def buildTeams():
     global allowFriends, state, userList
@@ -158,9 +160,7 @@ def buildTeams():
     assignUserToTeam('medic', 1, 'b', userList[getAPlayer('medic')])
     for i in range(10): #Debug : 10
         assignUserToTeam('', 1, 0, userList[getAPlayer('')])
-    printTeams()
-    initServer()
-    sendStartPrivateMessages()
+    startGame()
 
 def captain():
     global teamA, teamB
@@ -193,6 +193,16 @@ def cleanUserCommand(command):
     command = command.replace(')', '')
     return command
 
+def confirm(userName):
+    global confirmationList
+    counter = 0
+    for user in confirmationList:
+        if user['nick'] == userName:
+            print userName
+            del confirmationList[counter]
+            return 0
+        counter += 1
+
 def connect():
     global connectTimer, network, nick, name, port, server
     server.connect(network, port, nick, ircname = name)
@@ -200,7 +210,7 @@ def connect():
 def createUser(userName, userCommand):
     global classList, state
     commandList = string.split(userCommand, ' ')
-    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'late':0, 'nick':'', 'rating':-1, 'status':'', 'team':''}
+    user = {'command':'', 'class':[], 'confirmed':0, 'friends':{}, 'id':0, 'late':0, 'nick':'', 'status':'', 'team':''}
     user['command'] = userCommand
     user['id'] = getNextPlayerID()
     if (getUserCount() + 1) > 12:
@@ -246,6 +256,9 @@ def executeCommand(userName, userCommand):
     if re.search('^!captain', userCommand):
         captain()
         return 0
+    if re.search('^!confirm', userCommand):
+        confirm(userName)
+        return 0
     if re.search('^!endgame', userCommand):
         endGame()
         return 0
@@ -282,15 +295,6 @@ def executeCommand(userName, userCommand):
     if re.search('^!prototype*', userCommand):
         prototype()
         return 0
-    if re.search('^!rate', userCommand):
-        rate(userName, userCommand)
-        return 0
-    if re.search('^!rating$', userCommand) or re.search('^!rating ', userCommand):
-        rating(userName, userCommand)
-        return 0
-    if re.search('^!ratings', userCommand):
-        ratings(userName)
-        return 0
     if re.search('^!replace', userCommand):
         replace(userName, userCommand)
         return 0
@@ -302,6 +306,9 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('^!sub', userCommand):
         sub(userName, userCommand)
+        return 0
+    if re.search('^!unconfirmed', userCommand):
+        unconfirmed()
         return 0
     if re.search('^!votemap', userCommand):
         #votemap(userName, userCommand)
@@ -476,21 +483,6 @@ def getUserCount():
         teamCounter += 1
     return counter
 
-def getUserRating(userName):
-    whoisData = whois(userName)
-    if not len(whoisData):
-        return -1
-    else:
-        if len(whoisData['auth']) > 0:
-            cursor.execute('SELECT * FROM votes WHERE votedAuth = (?)', (whoisData['auth'][1],))
-        else:
-            cursor.execute('SELECT * FROM votes WHERE votedIP = (?)', (whoisData['info'][2],))
-        result = cursor.fetchone()
-        if result:
-            return result[3]
-        else:
-            return -1
-
 def help():
     send("PRIVMSG " + channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
 
@@ -549,7 +541,7 @@ def isUser(userName):
         return 0
 
 def initGame():
-    global gameServer, initTimer, state, teamA, teamB
+    global gameServer, initTimer, nick, state, teamA, teamB
     print "Init game."
     if state == "normal":
         state = 'building'
@@ -560,13 +552,13 @@ def initGame():
         state = 'picking'
         initTimer = threading.Timer(20, assignCaptains, ['captain'])
         initTimer.start()
-        ratings('', 1)
+        players(nick)
     elif state == "scrim":
         send("PRIVMSG " + channel + " :\x030,01Team is being drafted, please wait in the channel until this process's over.")
         state = 'picking'
         initTimer = threading.Timer(20, assignCaptains, ['scrim'])
         initTimer.start()
-        ratings('', 1)
+        players(nick)
 
 def initServer():
     global gameServer, rconPassword
@@ -730,15 +722,19 @@ def pick(userName, userCommand):
             printCaptainChoices()
         else:
             state = 'idle'
-            printTeams()
-            initServer()
-            sendStartPrivateMessages()
+            startGame()
     else:
         send("NOTICE " + userName + " : It is not your turn, or you are not authorized to pick a player.") 
 
 def players(userName):
     if isCaptain(userName) or isAdmin(userName):
         printCaptainChoices('channel')
+
+def privmsg(connection, event):
+    userName = extractUserName(event.source())
+    userCommand = cleanUserCommand(event.arguments()[0])
+    if re.search('^!confirm', userCommand):
+        confirm(userName)
 
 def pubmsg(connection, event):
     analyseCommand(connection, event)
@@ -800,6 +796,7 @@ def printTeams():
             message += '"' + user['nick'] + gameClass + '" '
         send("PRIVMSG " + channel + " :" + message)
         counter += 1
+    send("PRIVMSG " + channel + " :\x030,01Please confirm your presence by typing \"\x037,01!confirm\x030,01\" in the channel or directly to the bot.")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -815,90 +812,8 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    global userList
-    print userList
-
-def rate(userName, userCommand):
-    global userInfo
-    #Validation of the user vote.
-    commandList = string.split(userCommand, ' ')
-    validRatings = ['beginner', 'intermediate', 'advanced', 'expert']
-    if len(commandList) == 3:
-        if re.search('^[0-3]$', commandList[2]) or commandList[2] in validRatings:
-            if commandList[2] in validRatings:
-                vote = str(validRatings.index(commandList[2]))
-            else:
-                vote = commandList[2]
-            votedWhoisData = whois(commandList[1])
-            if not len(votedWhoisData):
-                send("PRIVMSG " + userName + " :Error, the bot encoutered a problem while processing the whois query.")
-                return 0
-        else:
-            send("PRIVMSG " + userName + " :Error, the second argument of your \"!vote\" command must be a number of 0 to 3.")
-            return 0
-    else:
-        send("PRIVMSG " + userName + " :Your vote can't be registered, you don't have the right number of arguments in yout command. Here is an example of a correct vote command: \"!vote nickname 3\".")
-        return 0
-    if len(votedWhoisData['info']) > 0:
-        voterWhoisData = whois(userName)
-        if not len(voterWhoisData):
-            send("PRIVMSG " + userName + " :Error, the bot encoutered a problem while processing the whois query.")
-            return 0
-        saveRating(votedWhoisData, voterWhoisData, vote)
-        send("PRIVMSG " + userName + " :You rated " + commandList[1] + " " + validRatings[int(vote)] + ".")
-    else:
-        send("PRIVMSG " + userName + " :The user you voted for does not exist.")
-        return 0
-
-def rating(userName, userCommand):
-    commandList = string.split(userCommand, ' ')
-    if len(commandList) < 2:
-        send("NOTICE " + userName + " : Error, you must supply an user name to the \"!rating\" command.")
-        return 0
-    userRating = getUserRating(commandList[1])
-    if userRating < 0:
-        send("NOTICE " + userName + " : Error, the user \"" + commandList[1] + "\" doesn't exists in our database.")
-        return 0
-    else:
-        ratingDescriptions = ['beginner', 'intermediate', 'advanced', 'expert']
-        send("PRIVMSG " + channel + " :\x030,01The user \"" + commandList[1] + "\" is rated " + ratingDescriptions[userRating] + ".")
-
-def ratings(userName, skipUserValidation = 0):
-    global userList
-    if skipUserValidation or isCaptain(userName) or isAdmin(userName):
-        notRatedPlayers = []
-        beginnerPlayers = []
-        intermediatePlayers = []
-        advancedPlayers = []
-        expertPlayers = []
-        userListCopy = userList.copy()
-        for user in userListCopy:
-            if userListCopy[user]['rating'] >= 0:
-                rating = userListCopy[user]['rating']
-            else:
-                rating = getUserRating(userListCopy[user]['nick'])
-            userListCopy[user]['rating'] = rating
-            if rating >= 0:
-                if rating == 3:
-                    expertPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
-                elif rating == 2:
-                    advancedPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
-                elif rating == 1:
-                    intermediatePlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
-                else:
-                    beginnerPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
-            else:
-                notRatedPlayers.append('(' + str(getPlayerNumber(userListCopy[user]['nick'])) + ')' + userListCopy[user]['nick'])
-        if len(expertPlayers):
-            send("PRIVMSG " + channel + " :\x030,01Expert players : " + ", ".join(expertPlayers))
-        if len(advancedPlayers):
-            send("PRIVMSG " + channel + " :\x030,01Advanced players : " + ", ".join(advancedPlayers))
-        if len(intermediatePlayers):
-            send("PRIVMSG " + channel + " :\x030,01Intermediate players : " + ", ".join(intermediatePlayers))
-        if len(beginnerPlayers):
-            send("PRIVMSG " + channel + " :\x030,01Beginner players : " + ", ".join(beginnerPlayers))
-        if len(notRatedPlayers):
-            send("PRIVMSG " + channel + " :\x030,01Not rated players : " + ", ".join(notRatedPlayers))
+    global confirmationList
+    print confirmationList
 
 def readPasswords():
     global authPassword, rconPassword
@@ -974,33 +889,22 @@ def restartBot():
     global restart
     restart = 1
 
-def saveRating(votedWhoisData, voterWhoisData, vote):
-    global connection, cursor
-    votedAuth = ''
-    votedIP = votedWhoisData['info'][2]
-    voterIP = voterWhoisData['info'][2]
-    if len(votedWhoisData['auth']):
-        votedAuth = votedWhoisData['auth'][1]
-        queryData = votedAuth,
-        cursor.execute('SELECT * FROM votes WHERE votedAuth = (?)', queryData)
-        if cursor.fetchone():
-            queryData = vote, voterIP, votedAuth
-            cursor.execute('UPDATE votes SET vote = (?), voterIP = (?) WHERE votedAuth = (?)', queryData)
-        else:
-            queryData = votedIP, votedAuth, voterIP, vote
-            cursor.execute('INSERT INTO votes VALUES (?, ?, ?, ?)', queryData)
-    else:
-        queryData = votedIP,
-        cursor.execute('SELECT * FROM votes WHERE votedIP = (?)', queryData)
-        if cursor.fetchone():
-            queryData = vote, voterIP, votedIP
-            cursor.execute('UPDATE votes SET vote = (?), voterIP = (?) WHERE votedIP = (?)', queryData)
-        else:
-            queryData = votedIP, '', voterIP, vote
-            cursor.execute('INSERT INTO votes VALUES (?, ?, ?, ?)', queryData)
-    connection.commit()
+def saveConfirmationList():
+    global confirmationList
+    confirmationList = []
+    teamName = ['blue', 'red']
+    teamCounter = 0
+    userCounter = 0
+    for teamID in ['a', 'b']:
+        team = getTeam(teamID)
+        for user in team:
+            confirmationList.append(user)
+            userCounter += 1
+        teamCounter += 1
+    print confirmationList
+    return 0
 
-def send(message, delay = 1.5):
+def send(message, delay = 2):
     global nextAvailableTimeSpot
     # Flood protection.
     actualTime = time.time()
@@ -1011,13 +915,13 @@ def send(message, delay = 1.5):
     threading.Timer(printInterval, server.send_raw, [message]).start()
 
 def sendStartPrivateMessages():
-    teamName = ['blue', 'red']
+    teamName = ['\x0312blue\x031', '\x034red\x031']
     teamCounter = 0
     userCounter = 0
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".", 3.5)
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". Don't forget to confirm your presence by typing \"\x034!confirm\x031\" in the channel or directly to the bot.", 3.5)
             userCounter += 1
         teamCounter += 1
     return 0
@@ -1025,6 +929,14 @@ def sendStartPrivateMessages():
 def setStartMode(mode):
     global startMode
     startMode = mode
+
+def startGame():
+    printTeams()
+    # Debug.
+    initServer()
+    saveConfirmationList()
+    sendStartPrivateMessages()
+    threading.Timer(60, unconfirmed).start()
 
 def sub(userName, userCommand):
     global subList
@@ -1047,6 +959,14 @@ def updateLast(ip, port, last):
         if (ip == serverList[i]['ip'] or ip == serverList[i]['dns']) and port == serverList[i]['port']:
             serverList[i]['last'] = last
             return 0
+
+def unconfirmed():
+    global confirmationList
+    unconfirmedList = []
+    for user in confirmationList:
+        unconfirmedList.append(user['nick'])
+    if len(unconfirmedList) > 0:
+        send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 These players did not confirm their presence : " + ", ".join(unconfirmedList) + ".")
 
 def welcome(connection, event):
     global authPassword
@@ -1104,21 +1024,23 @@ channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!rate", "!replace", "!restart"]
+adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!replace", "!restart"]
 allowFriends = 1
 authPassword = ''
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
+confirmationList = []
 connectTimer = threading.Timer(0, None)
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
 gameServer = ''
 gamesurgeCommands = ["!access", "!addcoowner", "!addmaster", "!addop", "!addpeon", "!adduser", "!clvl", "!delcoowner", "!deleteme", "!delmaster", "!delop", "!delpeon", "!deluser", "!deop", "!down", "!downall", "!devoice", "!giveownership", "!resync", "!trim", "!unsuspend", "!upall", "!uset", "!voice", "!wipeinfo"]
 initTimer = threading.Timer(0, None)
 lastCommand = ""
+lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_freight", "cp_granary"]
+mapList = ["cp_badlands", "cp_freight", "cp_granary", "cp_yukon_final"]
 minuteTimer = time.time()
 nextAvailableTimeSpot = time.time()
 nominatedCaptains = []
@@ -1132,7 +1054,7 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!game", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!rating", "!ratings", "!remove", "!sub", "!votemap"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!sub", "!unconfirmed", "!votemap"]
 userAuth = []
 userChannel = []
 userInfo = []
@@ -1143,7 +1065,7 @@ whoisEnded = 0
 
 #CREATE TABLE votes (votedIP varchar(255), votedAuth varchar(255), voterIP varchar(255), vote int)
 readPasswords()
-connection = sqlite3.connect('./tf2pb.sqlite')
+#connection = sqlite3.connect('./tf2pb.sqlite')
 cursor = connection.cursor()
 
 # Create an IRC object
@@ -1159,6 +1081,7 @@ irc.add_global_handler('endofwhois', whoisend)
 irc.add_global_handler('kick', drop)
 irc.add_global_handler('nick', nickchange)
 irc.add_global_handler('part', drop)
+irc.add_global_handler('privmsg', privmsg)
 irc.add_global_handler('pubmsg', pubmsg)
 irc.add_global_handler('quit', drop)
 irc.add_global_handler('welcome', welcome)
