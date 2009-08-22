@@ -4,7 +4,6 @@ import irclib
 import random
 import re
 import socket
-#import sqlite3
 import string
 import SRCDS
 import thread
@@ -19,11 +18,11 @@ def add(userName, userCommand):
     if state != 'idle':
         if state == 'captain' or state == 'normal':
             # Debug : 10
-            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE) and state == 'captain':
+            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand) and state == 'captain':
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                 return 0
             # Debug : 11
-            if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand, re.IGNORECASE) and state == 'captain':
+            if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand) and state == 'captain':
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join as this class.")
                 return 0
             # Debug : 12
@@ -35,14 +34,13 @@ def add(userName, userCommand):
             if len(userList) == 12:
                 initGame()
         elif state == 'scrim':
-            if len(userList) == 5 and classCount('medic') == 0 and not re.search('medic', userCommand, re.IGNORECASE):
+            if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand):
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                 return 0
-            if len(userList) < 6:
-                print "User add : " + userName + "  Command : " + userCommand
-                userList[userName] = createUser(userName, userCommand)
-                printUserList()
-            if len(userList) == 6:
+            print "User add : " + userName + "  Command : " + userCommand
+            userList[userName] = createUser(userName, userCommand)
+            printUserList()
+            if len(userList) >= 6 and classCount('medic') > 0:
                 initGame()
         elif state == 'picking' and not isUserCountOverLimit():
             if isInATeam(userName):
@@ -307,7 +305,7 @@ def executeCommand(userName, userCommand):
     if re.search('^!sub', userCommand):
         sub(userName, userCommand)
         return 0
-    if re.search('^!unconfirmed', userCommand):
+    if re.search('^!unconfirmeds*', userCommand):
         unconfirmed()
         return 0
     if re.search('^!votemap', userCommand):
@@ -747,7 +745,7 @@ def printCaptainChoices(printType = 'private'):
         send(dataPrefix + captainName + ", you are captain of a team and it's your turn to pick a player. Type \"!pick nick class\" to add somebody in your team.") 
         send(dataPrefix + "Remaining classes : " +  ', '.join(getRemainingClasses())) 
     else:
-        dataPrefix = "PRIVMSG " + channel + " :\x030,01 "
+        dataPrefix = "PRIVMSG " + channel + " :\x030,01"
     for gameClass in classList:
         choiceList = []
         for userName in userList.copy():
@@ -796,7 +794,7 @@ def printTeams():
             message += '"' + user['nick'] + gameClass + '" '
         send("PRIVMSG " + channel + " :" + message)
         counter += 1
-    send("PRIVMSG " + channel + " :\x030,01Please confirm your presence by typing \"\x037,01!confirm\x030,01\" in the channel or directly to the bot.")
+    send("PRIVMSG " + channel + " :\x030,01Please confirm your presence by typing \"\x038,01!confirm\x030,01\" in the channel or directly to the bot.")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -1063,10 +1061,7 @@ userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
 
-#CREATE TABLE votes (votedIP varchar(255), votedAuth varchar(255), voterIP varchar(255), vote int)
 readPasswords()
-#connection = sqlite3.connect('./tf2pb.sqlite')
-cursor = connection.cursor()
 
 # Create an IRC object
 irc = irclib.IRC()
