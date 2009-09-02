@@ -1,6 +1,7 @@
 #!/usr/bin/python2.6
 
 import irclib
+import math
 import random
 import re
 import socket
@@ -266,6 +267,9 @@ def executeCommand(userName, userCommand):
     if re.search('^!ip', userCommand):
         ip()
         return 0
+    if re.search('^!last', userCommand):
+        last()
+        return 0
     if re.search('^!limit', userCommand):
         limit(userName, userCommand)
         return 0
@@ -310,6 +314,9 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('^!votemap', userCommand):
         #votemap(userName, userCommand)
+        return 0
+    if re.search('^!whattimeisit', userCommand):
+        send("PRIVMSG " + channel + " :\x039,01Hammertime")
         return 0
 
 def extractClasses(userCommand):
@@ -516,6 +523,13 @@ def isCaptain(userName):
                 return 1
     return 0
 
+def isMatch():
+    global serverList
+    for server in serverList:
+        if server['last'] != 0:
+            return 1
+    return 0
+
 def isUserCountOverLimit():
     global teamA, teamB, userLimit, userList
     teams = [teamA, teamB]
@@ -559,9 +573,10 @@ def initGame():
         players(nick)
 
 def initServer():
-    global gameServer, rconPassword
+    global gameServer, lastGame, rconPassword
     TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
     TF2Server.rcon_command('changelevel ' + getMap())
+    lastGame = time.time()
     updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
 def isAdminCommand(userName, userCommand):
@@ -589,6 +604,22 @@ def isUserCommand(userName, userCommand):
             return 1
     send("NOTICE " + userName + " : Invalid command : \"" + userCommand + "\". Type \"!man\" for usage commands.")
     return 0
+
+def last():
+    global lastGame, serverList
+    if lastGame == 0:
+        send("PRIVMSG " + channel + " :\x030,010 matches have been played since the bot got restarted.")
+        return 0
+    message = "PRIVMSG " + channel + " :\x030,01"
+    if isMatch():
+        message += "A game is currently being played. "
+    lastTime = (time.time() - lastGame) / 3600
+    hours = math.floor(lastTime)
+    minutes = math.floor((lastTime - hours) * 60)
+    if hours != 0:
+        message += str(int(hours)) + " hour(s) "
+    message += str(int(minutes)) + " minute(s) "
+    send(message + "have elapsed since the last game started.")
 
 def limit(userName, userCommand):
     global userLimit
@@ -810,8 +841,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    global confirmationList
-    print confirmationList
+    return 0
 
 def readPasswords():
     global authPassword, rconPassword
@@ -935,6 +965,7 @@ def startGame():
     saveConfirmationList()
     sendStartPrivateMessages()
     threading.Timer(60, unconfirmed).start()
+    threading.Timer(150, unconfirmed).start()
 
 def sub(userName, userCommand):
     global subList
@@ -1035,6 +1066,7 @@ gameServer = ''
 gamesurgeCommands = ["!access", "!addcoowner", "!addmaster", "!addop", "!addpeon", "!adduser", "!clvl", "!delcoowner", "!deleteme", "!delmaster", "!delop", "!delpeon", "!deluser", "!deop", "!down", "!downall", "!devoice", "!giveownership", "!resync", "!trim", "!unsuspend", "!upall", "!uset", "!voice", "!wipeinfo"]
 initTimer = threading.Timer(0, None)
 lastCommand = ""
+lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
@@ -1052,7 +1084,7 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!sub", "!unconfirmed", "!votemap"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
