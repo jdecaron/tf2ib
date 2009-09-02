@@ -5,6 +5,7 @@ import math
 import random
 import re
 import socket
+import sqlite3
 import string
 import SRCDS
 import thread
@@ -305,6 +306,9 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('^!restart', userCommand):
         restartBot()
+        return 0
+    if re.search('^!stats', userCommand):
+        stats(userName, userCommand)
         return 0
     if re.search('^!sub', userCommand):
         sub(userName, userCommand)
@@ -712,7 +716,7 @@ def pick(userName, userCommand):
         return 0
     commandList = string.split(userCommand, ' ')
     if len(commandList) <= 2:
-        send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid pick command : \"!pick nick scout\".") 
+        send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid \"!pick\" command : \"!pick nick scout\".") 
         return 0
     del commandList[0]
     gameClass = ''
@@ -830,10 +834,10 @@ def printTeams():
 def printUserList():
     global lastUserPrint, printTimer, state, userList
     if (time.time() - lastUserPrint) > 5:
-        message = "\x030,01" + str(len(userList)) + " users subscribed :"
+        message = "\x030,01" + str(len(userList)) + " user(s) subscribed :"
         for i, user in userList.copy().iteritems():
             message += ' "' + user['nick'] + '"'
-        send("PRIVMSG " + channel + " :" + message)
+        send("PRIVMSG " + channel + " :" + message + ".")
     else:
         printTimer.cancel()
         printTimer = threading.Timer(5, printUserList)
@@ -841,7 +845,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    return 0
+    print saveStats()
 
 def readPasswords():
     global authPassword, rconPassword
@@ -858,7 +862,7 @@ def replace(userName, userCommand):
     teamList = ['a', 'b']
     commandList = string.split(userCommand, ' ')
     if len(commandList) < 2:
-        send("NOTICE " + userName + " : Error, there is not enough arguments in your replace command. Example : \"!replace toreplace substitute\".")
+        send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!replace\" command. Example : \"!replace toreplace substitute\".")
         return 0
     toReplace = commandList[1]
     substitute = commandList[2]
@@ -930,7 +934,19 @@ def saveConfirmationList():
             userCounter += 1
         teamCounter += 1
     print confirmationList
-    return 0
+
+def saveStats():
+    global connection, cursor
+    teamName = ['\x0312blue\x031', '\x034red\x031']
+    for teamID in ['a', 'b']:
+        team = getTeam(teamID)
+        for user in team:
+            if len(user['class']) == 0:
+                queryData = '', user['nick'], int(time.time())
+            else:
+                queryData = user['class'][0], user['nick'], int(time.time())
+            cursor.execute('INSERT INTO stats VALUES (?, ?, ?)', queryData)
+            connection.commit()
 
 def send(message, delay = 2):
     global nextAvailableTimeSpot
@@ -949,10 +965,9 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". Don't forget to confirm your presence by typing \"\x034!confirm\x031\" in the channel or directly to the bot.", 3.5)
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"\x034connect " + gameServer + "; password " + password + ";\x031\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". Don't forget to confirm your presence by typing \"\x034!confirm\x031\" in the channel or directly to the bot.", 3.5)
             userCounter += 1
         teamCounter += 1
-    return 0
 
 def setStartMode(mode):
     global startMode
@@ -965,7 +980,34 @@ def startGame():
     saveConfirmationList()
     sendStartPrivateMessages()
     threading.Timer(60, unconfirmed).start()
-    threading.Timer(150, unconfirmed).start()
+    threading.Timer(120, unconfirmed).start()
+    threading.Timer(180, unconfirmed).start()
+
+def stats(userName, userCommand):
+    commandList = string.split(userCommand, ' ')
+    if len(commandList) < 2:
+        send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!stats\" command. Example : \"!stats nick\".")
+        return 0
+    queryData = commandList[1],
+    cursor.execute('SELECT * FROM stats WHERE nick LIKE ?', queryData)
+    counter = 0
+    medicCounter = 0
+    for row in cursor:
+        last = row[2]
+        if row[0] == 'medic':
+            medicCounter += 1
+        counter += 1
+    if counter == 0:
+        send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
+        return 0
+    medicRatio = (medicCounter / counter) * 100
+    if medicRatio >= 20:
+        color = "\x039,01"
+    elif medicRatio >= 10:
+        color = "\x038,01"
+    else:
+        color = "\x034,01"
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' games and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
@@ -1084,7 +1126,7 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
@@ -1094,6 +1136,10 @@ voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
 
 readPasswords()
+
+#CREATE TABLE stats (class varchar(255), nick varchar(255), time int)
+connection = sqlite3.connect('./tf2pb.sqlite')
+cursor = connection.cursor()
 
 # Create an IRC object
 irc = irclib.IRC()
