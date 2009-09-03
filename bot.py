@@ -21,10 +21,12 @@ def add(userName, userCommand):
         if state == 'captain' or state == 'normal':
             # Debug : 10
             if len(userList) == 10 and classCount('medic') == 0 and not re.search('medic', userCommand) and state == 'captain':
+                stats(userName, "!stats " + userName)
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                 return 0
             # Debug : 11
             if len(userList) == 11 and classCount('medic') <= 1 and not re.search('medic', userCommand) and state == 'captain':
+                stats(userName, "!stats " + userName)
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join as this class.")
                 return 0
             # Debug : 12
@@ -318,9 +320,6 @@ def executeCommand(userName, userCommand):
         return 0
     if re.search('^!votemap', userCommand):
         #votemap(userName, userCommand)
-        return 0
-    if re.search('^!whattimeisit', userCommand):
-        send("PRIVMSG " + channel + " :\x039,01Hammertime")
         return 0
 
 def extractClasses(userCommand):
@@ -978,6 +977,7 @@ def startGame():
     # Debug.
     initServer()
     saveConfirmationList()
+    saveStats()
     sendStartPrivateMessages()
     threading.Timer(60, unconfirmed).start()
     threading.Timer(120, unconfirmed).start()
@@ -1000,14 +1000,14 @@ def stats(userName, userCommand):
     if counter == 0:
         send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
         return 0
-    medicRatio = (medicCounter / counter) * 100
+    medicRatio = float(medicCounter) / float(counter) * 100
     if medicRatio >= 20:
         color = "\x039,01"
     elif medicRatio >= 10:
         color = "\x038,01"
     else:
         color = "\x034,01"
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' games and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s) and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
@@ -1126,7 +1126,7 @@ teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap"]
 userAuth = []
 userChannel = []
 userInfo = []
