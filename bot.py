@@ -4,7 +4,6 @@ import irclib
 import math
 import random
 import re
-import socket
 import sqlite3
 import string
 import SRCDS
@@ -321,6 +320,9 @@ def executeCommand(userName, userCommand):
     if re.search('^!votemap', userCommand):
         #votemap(userName, userCommand)
         return 0
+    if re.search('^!whattimeisit', userCommand):
+        send("PRIVMSG " + channel + " :\x038,01* \x039,01Hammertime \x038,01*")
+        return 0
 
 def extractClasses(userCommand):
     global classList
@@ -331,6 +333,14 @@ def extractClasses(userCommand):
             if i == j:
                 classes.append(j)
     return classes
+
+def extractDBData(DBData):
+    global cursor, srcdsData
+    for row in DBData:
+        srcdsData.append(row)
+        cursor.execute('DELETE FROM srcds WHERE time = ?', (row[1],))
+        connection.commit()
+    return srcdsData
 
 def extractUserName(user):
     return string.split(user, '!')[0]
@@ -456,13 +466,6 @@ def getRemainingClasses():
     for gameClass in remainingClasses:
         uniqueRemainingClasses[gameClass] = gameClass
     return uniqueRemainingClasses
-
-def getServers():
-    global serverList
-    servers = []
-    for server in serverList:
-        servers.append(server['ip'])
-    return servers
 
 def getSubIndex(id):
     global subList
@@ -642,28 +645,14 @@ def limit(userName, userCommand):
     userLimit = int(commandList[1])
 
 def listeningTF2Servers():
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(('', 50007))
-    listener.listen(1)
     while 1:
-        try:
-            connection, address = listener.accept()
-        except:
-            listener.listen(1)
-            continue
-        try:
-            data = connection.recv(4096)
-        except:
-            continue
-        if data and address[0] in getServers():
-            print data
-            if re.search('^!needsub', data):
-                needsub('', data)
-            if re.search('^!gameover', data):
-                print "^!gameover"
-                print data
-                server = string.split(data, ' ')[1]
+        for i in range(0, len(srcdsData)):
+            if re.search('^!needsub', srcdsData[i][0]):
+                needsub('', srcdsData[i][0])
+            if re.search('^!gameover', srcdsData[i][0]):
+                server = string.split(srcdsData[i][0], ' ')[1]
                 updateLast(string.split(server, ':')[0], string.split(server, ':')[1], 0)
+            del srcdsData[i]
 
 def mumble():
     global voiceServer
@@ -759,8 +748,7 @@ def pick(userName, userCommand):
         send("NOTICE " + userName + " : It is not your turn, or you are not authorized to pick a player.") 
 
 def players(userName):
-    if isCaptain(userName) or isAdmin(userName):
-        printCaptainChoices('channel')
+    printCaptainChoices('channel')
 
 def privmsg(connection, event):
     userName = extractUserName(event.source())
@@ -1001,9 +989,9 @@ def stats(userName, userCommand):
         send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
         return 0
     medicRatio = float(medicCounter) / float(counter) * 100
-    if medicRatio >= 20:
+    if medicRatio >= 15:
         color = "\x039,01"
-    elif medicRatio >= 10:
+    elif medicRatio >= 5:
         color = "\x038,01"
     else:
         color = "\x034,01"
@@ -1125,8 +1113,9 @@ teamA = []
 teamB = []
 restart = 0
 serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
+srcdsData = []
 subList = []
-userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap"]
+userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
@@ -1140,6 +1129,7 @@ readPasswords()
 #CREATE TABLE stats (class varchar(255), nick varchar(255), time int)
 connection = sqlite3.connect('./tf2pb.sqlite')
 cursor = connection.cursor()
+srcdsData = extractDBData(cursor.execute('SELECT * FROM srcds'))
 
 # Create an IRC object
 irc = irclib.IRC()
@@ -1168,6 +1158,7 @@ thread.start_new_thread(listeningTF2Servers, ())
 # Jump into an infinite loop
 while not restart:
     irc.process_once(0.2)
+    srcdsData = extractDBData(cursor.execute('SELECT * FROM srcds'))
     if time.time() - minuteTimer > 60:
         minuteTimer = time.time()
         checkConnection()
