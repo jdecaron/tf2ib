@@ -646,6 +646,7 @@ def limit(userName, userCommand):
 
 def listeningTF2Servers():
     while 1:
+        time.sleep(1)
         for i in range(0, len(srcdsData)):
             if re.search('^!needsub', srcdsData[i][0]):
                 needsub('', srcdsData[i][0])
