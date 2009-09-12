@@ -15,7 +15,7 @@ finally:
     file.close()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listener.bind(('', 50001))
+listener.bind(('', 50007))
 listener.listen(1)
 while 1:
     try:
