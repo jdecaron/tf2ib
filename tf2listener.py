@@ -1,18 +1,22 @@
 #!/usr/bin/python2.6
 
+import psycopg2
 import socket
-import sqlite3
 import time
 
-#CREATE TABLE srcds(data TEXT, time INTEGER);
-database = sqlite3.connect('./tf2pb.sqlite')
-cursor = database.cursor()
-
-file = open("servers.txt")
+passwordFile = open("passwords.txt")
+serverFile = open("servers.txt")
 try:
-    servers = file.readline().replace('\n', '').split(':')
+    passwords = passwordFile.readline().replace('\n', '').split(':')
+    tf2pbPassword = passwords[0]
+    servers = serverFile.readline().replace('\n', '').split(':')
 finally:
-    file.close()
+    passwordFile.close()
+    serverFile.close()
+
+#CREATE TABLE srcds(data TEXT, time INTEGER);
+database = psycopg2.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
+cursor = database.cursor()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.bind(('', 50007))
@@ -28,7 +32,7 @@ while 1:
     except:
         continue
     if data and address[0] in servers:
-        data = data, int(time.time())
-        cursor.execute('INSERT INTO srcds VALUES (?, ?)', data)
+        print data
+        cursor.execute('INSERT INTO srcds VALUES (%s, %s)', (data, int(time.time())))
         database.commit()
         connection.close()

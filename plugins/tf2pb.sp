@@ -1,4 +1,5 @@
 #include <socket>
+#include <sdktools_functions>
 #include <sourcemod>
 
 new String:serverIP[64];
@@ -66,11 +67,11 @@ public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadc
         StripQuotes(userText);
         StrCat(query, 192, userText);
         StrCat(query, 192, " ");
+        StrCat(query, 192, steamID);
+        StrCat(query, 192, " ");
         StrCat(query, 192, serverIP);
         StrCat(query, 192, ":");
         StrCat(query, 192, port);
-        StrCat(query, 192, " ");
-        StrCat(query, 192, steamID);
         sendDataToBot(query);
     }
 	
@@ -118,10 +119,18 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 
 public gameOver()
 {
+    new String:blueScore[2];
+    new String:redScore[2];
+    IntToString(GetTeamScore(3), blueScore, 2);
+    IntToString(GetTeamScore(2), redScore, 2);
     ServerCommand("tv_stoprecord");
     decl String:query[192];
     query = "";
     StrCat(query, 192, "!gameover");
+    StrCat(query, 192, " ");
+    StrCat(query, 192, blueScore);
+    StrCat(query, 192, ":");
+    StrCat(query, 192, redScore);
     StrCat(query, 192, " ");
     StrCat(query, 192, serverIP);
     StrCat(query, 192, ":");
@@ -178,5 +187,5 @@ public sendDataToBot(String:query[])
 {
     new Handle:socket = SocketCreate(SOCKET_TCP, OnSocketError);
     Format(socketData, sizeof(socketData), "%s", query);
-    SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "bot.tf2pug.org", 50007)
+    SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "192.168.1.102", 50007)
 }

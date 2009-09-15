@@ -2,9 +2,9 @@
 
 import irclib
 import math
+import psycopg2
 import random
 import re
-import sqlite3
 import string
 import SRCDS
 import thread
@@ -121,7 +121,7 @@ def assignCaptains(mode = 'captain'):
     printCaptainChoices()
 
 def assignUserToTeam(gameClass, recursiveFriend, team, user):
-    global allowFriends, teamA, teamB, userList
+    global allowFriends, pastGames, teamA, teamB, userList
     if gameClass:
         user['class'] = [gameClass]
     else:
@@ -131,6 +131,7 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
             team = 'a'
         else:
             team = 'b'
+    user['team'] = team
     # Assign the user to the team if the team's not full.
     if len(getTeam(team)) < 6: # Debug : 6
         getTeam(team).append(user)
@@ -145,6 +146,7 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
                 counter += 1
             if counter >= getNumberOfFriendsPerClass(userList[user['nick']]['class']):
                 break
+    pastGames[len(pastGames) - 1]['players'].append(userList[user['nick']])
     del userList[user['nick']]
     return 0
 
@@ -334,14 +336,6 @@ def extractClasses(userCommand):
                 classes.append(j)
     return classes
 
-def extractDBData(DBData):
-    global cursor, srcdsData
-    for row in DBData:
-        srcdsData.append(row)
-        cursor.execute('DELETE FROM srcds WHERE time = ?', (row[1],))
-        connection.commit()
-    return srcdsData
-
 def extractUserName(user):
     return string.split(user, '!')[0]
 
@@ -398,9 +392,8 @@ def getAPlayer(gameClass):
         return forcedList[0]
 
 def getAvailableServer():
-    global serverList
-    for server in serverList:
-        if (time.time() - server['last']) >= (60 * 60):
+    for server in getServerList():
+        if server['last'] == 0:
             return {'ip':server['dns'], 'port':server['port']}
     return 0
 
@@ -467,6 +460,13 @@ def getRemainingClasses():
         uniqueRemainingClasses[gameClass] = gameClass
     return uniqueRemainingClasses
 
+def getServerList():
+    serverList = []
+    cursor.execute('SELECT * FROM servers')
+    for row in cursor.fetchall():
+        serverList.append({'dns':row[0], 'ip':row[1], 'last':row[2], 'port':row[3]})
+    return serverList
+
 def getSubIndex(id):
     global subList
     counter = 0
@@ -530,8 +530,7 @@ def isCaptain(userName):
     return 0
 
 def isMatch():
-    global serverList
-    for server in serverList:
+    for server in getServerList():
         if server['last'] != 0:
             return 1
     return 0
@@ -559,8 +558,10 @@ def isUser(userName):
         return 0
 
 def initGame():
-    global gameServer, initTimer, nick, state, teamA, teamB
+    global gameServer, initTime, initTimer, nick, pastGames, state, teamA, teamB
     print "Init game."
+    initTime = int(time.time())
+    pastGames.append({'players':[], 'server':gameServer, 'time':initTime})
     if state == "normal":
         state = 'building'
         initTimer = threading.Timer(20, buildTeams)
@@ -583,7 +584,6 @@ def initServer():
     TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
     TF2Server.rcon_command('changelevel ' + getMap())
     lastGame = time.time()
-    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
 def isAdminCommand(userName, userCommand):
     global adminCommands
@@ -612,7 +612,7 @@ def isUserCommand(userName, userCommand):
     return 0
 
 def last():
-    global lastGame, serverList
+    global lastGame
     if lastGame == 0:
         send("PRIVMSG " + channel + " :\x030,010 matches have been played since the bot got restarted.")
         return 0
@@ -645,15 +645,26 @@ def limit(userName, userCommand):
     userLimit = int(commandList[1])
 
 def listeningTF2Servers():
+    global connection, cursor, pastGames
     while 1:
         time.sleep(1)
-        for i in range(0, len(srcdsData)):
-            if re.search('^!needsub', srcdsData[i][0]):
-                needsub('', srcdsData[i][0])
-            if re.search('^!gameover', srcdsData[i][0]):
-                server = string.split(srcdsData[i][0], ' ')[1]
-                updateLast(string.split(server, ':')[0], string.split(server, ':')[1], 0)
-            del srcdsData[i]
+        cursor.execute('SELECT * FROM srcds')
+        queryData = cursor.fetchall()
+        for i in range(0, len(queryData)):
+            srcdsData = queryData[i][0].split()
+            server = srcdsData[len(srcdsData) - 1]
+            ip = string.split(server, ':')[0]
+            port = string.split(server, ':')[1]
+            for pastGame in pastGames:
+                if pastGame['server'] == server:
+                    if re.search('^!needsub', srcdsData[0]):
+                        needsub('', queryData[i][0])
+                    if re.search('^!gameover', srcdsData[0]):
+                        score = string.split(srcdsData[0], ' ')[1]
+                        updateLast(ip, port, 0)
+                        updateStats(ip + ":" + port, score)
+                    cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
+                    connection.commit()
 
 def mumble():
     global voiceServer
@@ -738,7 +749,6 @@ def pick(userName, userCommand):
     if isAuthorizedCaptain(userName):
         send("NOTICE " + userName + " : You selected \"" + commandList[0] + "\" as \"" + gameClass + "\".")
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
-        # Debug : (len(captainStageList) - 1)
         if captainStage < (len(captainStageList) - 1):
             captainStage += 1
             printCaptainChoices()
@@ -833,15 +843,15 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    print saveStats()
+    updateStats('192.168.1.102:27015', '0:1')
 
 def readPasswords():
-    global authPassword, rconPassword
+    global rconPassword, tf2pbPassword
     passwordFile = open("passwords.txt")
     try:
         passwords = passwordFile.readline().replace('\n', '').split(':')
-        authPassword = passwords[0]
         rconPassword = passwords[1]
+        tf2pbPassword = passwords[0]
     finally:
         passwordFile.close()
 
@@ -924,7 +934,7 @@ def saveConfirmationList():
     print confirmationList
 
 def saveStats():
-    global connection, cursor
+    global connection, cursor, initTime
     teamName = ['\x0312blue\x031', '\x034red\x031']
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
@@ -932,9 +942,8 @@ def saveStats():
             if len(user['class']) == 0:
                 queryData = '', user['nick'], int(time.time())
             else:
-                queryData = user['class'][0], user['nick'], int(time.time())
-            cursor.execute('INSERT INTO stats VALUES (?, ?, ?)', queryData)
-            connection.commit()
+                cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime))
+                connection.commit()
 
 def send(message, delay = 2):
     global nextAvailableTimeSpot
@@ -962,8 +971,8 @@ def setStartMode(mode):
     startMode = mode
 
 def startGame():
+    global gameServer
     printTeams()
-    # Debug.
     initServer()
     saveConfirmationList()
     saveStats()
@@ -971,18 +980,20 @@ def startGame():
     threading.Timer(60, unconfirmed).start()
     threading.Timer(120, unconfirmed).start()
     threading.Timer(180, unconfirmed).start()
+    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
 
 def stats(userName, userCommand):
     commandList = string.split(userCommand, ' ')
     if len(commandList) < 2:
         send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!stats\" command. Example : \"!stats nick\".")
         return 0
-    queryData = commandList[1],
-    cursor.execute('SELECT * FROM stats WHERE nick LIKE ?', queryData)
+    cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s', (commandList[1],))
     counter = 0
     medicCounter = 0
-    for row in cursor:
-        last = row[2]
+    score = 0
+    for row in cursor.fetchall():
+        last = row[3]
+        score += row[2]
         if row[0] == 'medic':
             medicCounter += 1
         counter += 1
@@ -996,7 +1007,7 @@ def stats(userName, userCommand):
         color = "\x038,01"
     else:
         color = "\x034,01"
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s) and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win score of \"' +str(score) +'\" and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
@@ -1014,11 +1025,32 @@ def sub(userName, userCommand):
     return 0
 
 def updateLast(ip, port, last):
-    global gameServer, serverList
-    for i in range(0, len(serverList)):
-        if (ip == serverList[i]['ip'] or ip == serverList[i]['dns']) and port == serverList[i]['port']:
-            serverList[i]['last'] = last
-            return 0
+    global connection, cursor
+    cursor.execute('UPDATE servers SET last = %s WHERE ip = %s and port = %s', (last, ip, port))
+    connection.commit()
+
+def updateStats(server, score):
+    global connection, cursor, pastGames
+    for i in range(len(pastGames)):
+        print i
+        print pastGames[i]
+        if pastGames[i]['server'] == server:
+            scoreList = score.split(':')
+            scoreDict = {'a':0, 'b':1}
+            print scoreList
+            if int(scoreList[0]) == int(scoreList[1]):
+                scoreDict['a'] = 0
+                scoreDict['b'] = 0
+            elif int(scoreList[0]) > int(scoreList[1]):
+                scoreDict['a'] = 1
+                scoreDict['b'] = -1
+            else:
+                scoreDict['a'] = -1
+                scoreDict['b'] = 1
+            for player in pastGames[i]['players']:
+                cursor.execute('UPDATE stats SET result = %s WHERE nick = %s AND time = %s', (str(scoreDict[player['team']]), player['nick'], pastGames[i]['time']))
+            connection.commit()
+            del(pastGames[i])
 
 def unconfirmed():
     global confirmationList
@@ -1029,8 +1061,8 @@ def unconfirmed():
         send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 These players did not confirm their presence : " + ", ".join(unconfirmedList) + ".")
 
 def welcome(connection, event):
-    global authPassword
-    server.send_raw("authserv auth " + nick + " " + authPassword)
+    global tf2pbPassword
+    server.send_raw("authserv auth " + nick + " " + tf2pbPassword)
     server.send_raw("MODE " + nick + " +x")
     server.join(channel)
 
@@ -1086,7 +1118,6 @@ name = 'BOT'
 
 adminCommands = ["!addgame", "!automatic", "!endgame", "!manual", "!needsub", "!prototype", "!replace", "!restart"]
 allowFriends = 1
-authPassword = ''
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
@@ -1095,6 +1126,7 @@ connectTimer = threading.Timer(0, None)
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
 gameServer = ''
 gamesurgeCommands = ["!access", "!addcoowner", "!addmaster", "!addop", "!addpeon", "!adduser", "!clvl", "!delcoowner", "!deleteme", "!delmaster", "!delop", "!delpeon", "!deluser", "!deop", "!down", "!downall", "!devoice", "!giveownership", "!resync", "!trim", "!unsuspend", "!upall", "!uset", "!voice", "!wipeinfo"]
+initTime = int(time.time())
 initTimer = threading.Timer(0, None)
 lastCommand = ""
 lastGame = 0
@@ -1106,6 +1138,7 @@ minuteTimer = time.time()
 nextAvailableTimeSpot = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
+pastGames = []
 printTimer = threading.Timer(0, None)
 rconPassword = ''
 startMode = 'automatic'
@@ -1113,9 +1146,8 @@ state = 'idle'
 teamA = []
 teamB = []
 restart = 0
-serverList = [{'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27015'}, {'dns':'dallas.tf2pug.org', 'ip':'72.14.177.61', 'last':0, 'port':'27016'}]
-srcdsData = []
 subList = []
+tf2pbPassword = ''
 userCommands = ["!add", "!addfriend", "!addfriends", "!captain", "!confirm", "!game", "!ip", "!last", "!limit", "!man", "!mumble", "!notice", "!pick", "!players", "!remove", "!stats", "!sub", "!unconfirmed", "!votemap", "!whattimeisit"]
 userAuth = []
 userChannel = []
@@ -1127,10 +1159,10 @@ whoisEnded = 0
 
 readPasswords()
 
-#CREATE TABLE stats (class varchar(255), nick varchar(255), time int)
-connection = sqlite3.connect('./tf2pb.sqlite')
+#CREATE TABLE stats (class varchar(255), nick varchar(255), result int, time int)
+#CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10))
+connection = psycopg2.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
 cursor = connection.cursor()
-srcdsData = extractDBData(cursor.execute('SELECT * FROM srcds'))
 
 # Create an IRC object
 irc = irclib.IRC()
@@ -1159,7 +1191,6 @@ thread.start_new_thread(listeningTF2Servers, ())
 # Jump into an infinite loop
 while not restart:
     irc.process_once(0.2)
-    srcdsData = extractDBData(cursor.execute('SELECT * FROM srcds'))
     if time.time() - minuteTimer > 60:
         minuteTimer = time.time()
         checkConnection()
