@@ -397,6 +397,12 @@ def getAvailableServer():
             return {'ip':server['dns'], 'port':server['port']}
     return 0
 
+def getDNSFromIP(ip):
+    for server in getServerList():
+        if server['ip'] == ip:
+            return server['dns']
+    return ip
+
 def getMap():
     global mapList
     return mapList[random.randint(0, (len(mapList) - 1))]
@@ -656,7 +662,7 @@ def listeningTF2Servers():
             ip = string.split(server, ':')[0]
             port = string.split(server, ':')[1]
             for pastGame in pastGames:
-                if pastGame['server'] == server:
+                if pastGame['server'] == server or pastGame['server'] == getDNSFromIP(ip) + ':' + port:
                     if re.search('^!needsub', srcdsData[0]):
                         needsub('', queryData[i][0])
                     if re.search('^!gameover', srcdsData[0]):
@@ -843,7 +849,9 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    updateStats('192.168.1.102:27015', '0:1')
+    global pastGame
+    pastGames.append({'players':[], 'server':gameServer, 'time':initTime})
+    print pastGames
 
 def readPasswords():
     global rconPassword, tf2pbPassword
