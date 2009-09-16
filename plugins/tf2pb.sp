@@ -5,6 +5,7 @@
 new String:serverIP[64];
 new String:socketData[192];
 new disconnectedPlayers[32][2];
+new lastGameOver = 0;
 new lastTournamentStateUpdate = 0;
 new String:port[16];
 new String:server[16] = "dallas"; 
@@ -119,26 +120,30 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 
 public gameOver()
 {
-    new String:blueScore[2];
-    new String:redScore[2];
-    IntToString(GetTeamScore(3), blueScore, 2);
-    IntToString(GetTeamScore(2), redScore, 2);
-    ServerCommand("tv_stoprecord");
-    decl String:query[192];
-    query = "";
-    StrCat(query, 192, "!gameover");
-    StrCat(query, 192, " ");
-    StrCat(query, 192, blueScore);
-    StrCat(query, 192, ":");
-    StrCat(query, 192, redScore);
-    StrCat(query, 192, " ");
-    StrCat(query, 192, serverIP);
-    StrCat(query, 192, ":");
-    StrCat(query, 192, port);
-    sendDataToBot(query);
-    PrintToChatAll("%s", query);
-    PrintToChatAll("TF2 Game Over");
-    ServerCommand("exec tf2dm.cfg");
+    if(GetTime() - lastGameOver >= 60)
+    {
+        new String:blueScore[2];
+        new String:redScore[2];
+        IntToString(GetTeamScore(3), blueScore, 2);
+        IntToString(GetTeamScore(2), redScore, 2);
+        lastGameOver = GetTime();
+        ServerCommand("tv_stoprecord");
+        decl String:query[192];
+        query = "";
+        StrCat(query, 192, "!gameover");
+        StrCat(query, 192, " ");
+        StrCat(query, 192, blueScore);
+        StrCat(query, 192, ":");
+        StrCat(query, 192, redScore);
+        StrCat(query, 192, " ");
+        StrCat(query, 192, serverIP);
+        StrCat(query, 192, ":");
+        StrCat(query, 192, port);
+        sendDataToBot(query);
+        PrintToChatAll("%s", query);
+        PrintToChatAll("TF2 Game Over");
+        ServerCommand("exec tf2dm.cfg");
+    }
 }
 
 public OnPluginStart()
