@@ -403,6 +403,12 @@ def getDNSFromIP(ip):
             return server['dns']
     return ip
 
+def getIPFromDNS(dns):
+    for server in getServerList():
+        if server['dns'] == dns:
+            return server['ip']
+    return dns
+
 def getMap():
     global mapList
     return mapList[random.randint(0, (len(mapList) - 1))]
@@ -666,9 +672,9 @@ def listeningTF2Servers():
                     if re.search('^!needsub', srcdsData[0]):
                         needsub('', queryData[i][0])
                     if re.search('^!gameover', srcdsData[0]):
-                        score = string.split(srcdsData[0], ' ')[1]
+                        score = srcdsData[1]
                         updateLast(ip, port, 0)
-                        updateStats(ip + ":" + port, score)
+                        updateStats(ip, port, score)
                     cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
                     connection.commit()
 
@@ -849,8 +855,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    global pastGame
-    pastGames.append({'players':[], 'server':gameServer, 'time':initTime})
+    print getServerList()
     print pastGames
 
 def readPasswords():
@@ -988,7 +993,7 @@ def startGame():
     threading.Timer(60, unconfirmed).start()
     threading.Timer(120, unconfirmed).start()
     threading.Timer(180, unconfirmed).start()
-    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], time.time())
+    updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], int(time.time()))
 
 def stats(userName, userCommand):
     commandList = string.split(userCommand, ' ')
@@ -998,13 +1003,17 @@ def stats(userName, userCommand):
     cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s', (commandList[1],))
     counter = 0
     medicCounter = 0
-    score = 0
+    winCounter = 0
     for row in cursor.fetchall():
         last = row[3]
-        score += row[2]
+        if row[2] == 0:
+            winCounter += .5
+        elif row[2] == 1:
+            winCounter += 1
         if row[0] == 'medic':
             medicCounter += 1
         counter += 1
+    winRatio = int(float(winCounter) / float(counter) * 100)
     if counter == 0:
         send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
         return 0
@@ -1015,14 +1024,14 @@ def stats(userName, userCommand):
         color = "\x038,01"
     else:
         color = "\x034,01"
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win score of \"' +str(score) +'\" and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
     commandList = string.split(userCommand)
     id = ''
     for argument in commandList:
-        if re.search('[0-9]', argument):
+        if re.search('^[0-9]$', argument):
             id = argument
     if id == '' or getSubIndex(id) == -1:
         send("NOTICE " + userName + " :You must supply a valid substitute ID. Example : \"!sub 1\".")
@@ -1034,18 +1043,16 @@ def sub(userName, userCommand):
 
 def updateLast(ip, port, last):
     global connection, cursor
+    ip = getIPFromDNS(ip)
     cursor.execute('UPDATE servers SET last = %s WHERE ip = %s and port = %s', (last, ip, port))
     connection.commit()
 
-def updateStats(server, score):
+def updateStats(address, port, score):
     global connection, cursor, pastGames
     for i in range(len(pastGames)):
-        print i
-        print pastGames[i]
-        if pastGames[i]['server'] == server:
+        if pastGames[i]['server'] == getIPFromDNS(address) + ':' + port or pastGames[i]['server'] == getDNSFromIP(address) + ':' + port:
             scoreList = score.split(':')
             scoreDict = {'a':0, 'b':1}
-            print scoreList
             if int(scoreList[0]) == int(scoreList[1]):
                 scoreDict['a'] = 0
                 scoreDict['b'] = 0
@@ -1118,7 +1125,7 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = '127.0.0.1'
+network = 'NuclearFallout.WA.US.GameSurge.net'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
