@@ -677,6 +677,9 @@ def listeningTF2Servers():
                         updateStats(ip, port, score)
                     cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
                     connection.commit()
+            if time.time() - queryData[i][1] >= 10:
+                cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
+                connection.commit()
 
 def mumble():
     global voiceServer
@@ -1013,18 +1016,18 @@ def stats(userName, userCommand):
         if row[0] == 'medic':
             medicCounter += 1
         counter += 1
-    winRatio = int(float(winCounter) / float(counter) * 100)
     if counter == 0:
         send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
         return 0
-    medicRatio = float(medicCounter) / float(counter) * 100
+    medicRatio = int(float(medicCounter) / float(counter) * 100)
+    winRatio = int(float(winCounter) / float(counter) * 100)
     if medicRatio >= 15:
         color = "\x039,01"
     elif medicRatio >= 5:
         color = "\x038,01"
     else:
         color = "\x034,01"
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(int(medicRatio)) + '%\x030,01.')
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
@@ -1049,7 +1052,7 @@ def updateLast(ip, port, last):
 
 def updateStats(address, port, score):
     global connection, cursor, pastGames
-    for i in range(len(pastGames)):
+    for i in reversed(range(len(pastGames))):
         if pastGames[i]['server'] == getIPFromDNS(address) + ':' + port or pastGames[i]['server'] == getDNSFromIP(address) + ':' + port:
             scoreList = score.split(':')
             scoreDict = {'a':0, 'b':1}
@@ -1125,7 +1128,7 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = 'NuclearFallout.WA.US.GameSurge.net'
+network = '192.168.1.102'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -1148,7 +1151,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_freight", "cp_granary", "cp_yukon_final"]
+mapList = ["cp_badlands", "cp_freight", "cp_granary"]
 minuteTimer = time.time()
 nextAvailableTimeSpot = time.time()
 nominatedCaptains = []
