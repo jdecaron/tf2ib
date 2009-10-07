@@ -104,7 +104,7 @@ def analyseCommand(connection, event):
         elif isUserCommand(userName, escapedUserCommand, userCommand):
                 executeCommand(userName, escapedUserCommand, userCommand)
     if userName in userList:
-        updateUserStatus(userName)
+        updateUserStatus(userName, escapedUserCommand)
 
 def assignCaptains(mode = 'captain'):
     global teamA, teamB
@@ -504,7 +504,7 @@ def getServerList():
     serverList = []
     cursor.execute('SELECT * FROM servers')
     for row in cursor.fetchall():
-        serverList.append({'dns':row[0], 'ip':row[1], 'last':row[2], 'port':row[3]})
+        serverList.append({'dns':row[0], 'ip':row[1], 'last':row[2], 'port':row[3], 'botID':row[4]})
     return serverList
 
 def getSubIndex(id):
@@ -587,7 +587,7 @@ def isGamesurgeCommand(userCommand):
 
 def isMatch():
     for server in getServerList():
-        if server['last'] != 0:
+        if server['last'] > 0 and server['botID'] == botID:
             return 1
     return 0
 
@@ -1031,9 +1031,16 @@ def send(message, delay = 0):
 def sendMessageToAwayPlayers():
     global awayList, awayTimer, init
     awayTimer = threading.Timer(60, removeAwayUsers).start()
-    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 " + str(len(awayList)) + " players are flagged as away. If they don't show any activity they will automatically be removed from the list after 1 minute.")
+    if len(awayList) > 1:
+        words = ['These players are', 'they don\'t', 'they']
+    else:
+        words = ['This player is', 'he doesn\'t', 'they']
+    nickList = []
+    for nick in awayList:
+        nickList.append(nick)
+    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 " + words[0] + " considered as innactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
     for user in awayList:
-        send("PRIVMSG " + user + ' :Warning, you have been flagged as innactive by the system and a game you subscribed just started. If you still want to play this game you have to type anything in the channel. If you don\'t want to play it you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
+        send("PRIVMSG " + user + ' :Warning, you are considered as innactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
 
 def sendStartPrivateMessages():
     teamName = ['\x0312blue\x031', '\x034red\x031']
@@ -1134,17 +1141,20 @@ def updateStats(address, port, score):
             connection.commit()
             del(pastGames[i])
 
-def updateUserStatus(nick):
+def updateUserStatus(nick, escapedUserCommand):
     global awayList, userList
     try:
         numberOfPlayers = 12
         if len(captainStageList) == 5:
             numberOfPlayers = 6
-        userList[nick]['last'] = time.time()
-        if nick in awayList:
-            del awayList[nick]
-        if len(userList) == numberOfPlayers and len(awayList) == 0:
-            initGame()
+        if re.search('^\\\\!away', escapedUserCommand):
+            userList[nick]['last'] = time.time() - (10 * 60)
+        else:
+            userList[nick]['last'] = time.time()
+            if nick in awayList:
+                del awayList[nick]
+            if len(userList) == numberOfPlayers and len(awayList) == 0:
+                initGame()
     except:
         return 0
 
@@ -1245,7 +1255,7 @@ teamB = []
 restart = 0
 subList = []
 tf2pbPassword = ''
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!captain", "\\!confirm", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!notice", "\\!pick", "\\!players", "\\!remove", "\\!stats", "\\!sub", "\\!unconfirmed", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!confirm", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!stats", "\\!sub", "\\!unconfirmed", "\\!votemap", "\\!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
