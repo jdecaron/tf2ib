@@ -2,7 +2,7 @@
 
 import irclib
 import math
-import psycopg2
+import psycopg
 import random
 import re
 import string
@@ -151,13 +151,14 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
     return 0
 
 def autoGameStart():
-    global botID, connection, cursor, lastGameType, nick, startMode, state
+    global botID, connection, lastGameType, nick, startMode, state
     if state == 'idle':
         server = getAvailableServer()
     else:
         return 0
+    cursor = connection.cursor()
     cursor.execute('UPDATE servers SET last = 0 WHERE last < 0 AND botID = %s', (botID,))
-    connection.commit()
+    cursor.execute('COMMIT;')
     if server and startMode == 'automatic':
         addGame(nick, '!addgame ' + lastGameType + ' ' + server['ip'] + ':' + server['port'])
 
@@ -502,6 +503,7 @@ def getRemainingClasses():
 
 def getServerList():
     serverList = []
+    cursor = connection.cursor()
     cursor.execute('SELECT * FROM servers')
     for row in cursor.fetchall():
         serverList.append({'dns':row[0], 'ip':row[1], 'last':row[2], 'port':row[3], 'botID':row[4]})
@@ -627,13 +629,13 @@ def initGame():
         initTimer = threading.Timer(20, buildTeams)
         initTimer.start()
     elif state == "captain":
-        send("PRIVMSG " + channel + " :\x030,01Teams are being drafted, please wait in the channel until this process is over.")
+        send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
         initTimer = threading.Timer(20, assignCaptains, ['captain'])
         initTimer.start()
         players(nick)
     elif state == "scrim":
-        send("PRIVMSG " + channel + " :\x030,01Team is being drafted, please wait in the channel until this process is over.")
+        send("PRIVMSG " + channel + " :\x038,01Team is being drafted, please wait in the channel until this process is over.")
         state = 'picking'
         initTimer = threading.Timer(20, assignCaptains, ['scrim'])
         initTimer.start()
@@ -691,7 +693,8 @@ def limit(userName, userCommand):
     userLimit = int(commandList[1])
 
 def listeningTF2Servers():
-    global connection, cursor, pastGames
+    global connection, pastGames
+    cursor = connection.cursor()
     while 1:
         time.sleep(1)
         cursor.execute('SELECT * FROM srcds')
@@ -714,10 +717,10 @@ def listeningTF2Servers():
                         updateStats(ip, port, score)
                         send("PRIVMSG " + channel + " :\x030,01Game over on server \"" + getDNSFromIP(ip) + ":" + port + "\", final score is : \x0311,01" + score.split(':')[0] + "\x030,01 to \x034,01" + score.split(':')[1] + "\x030,01.")
                     cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
-                    connection.commit()
+                    cursor.execute('COMMIT;')
             if time.time() - queryData[i][1] >= 20:
                 cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
-                connection.commit()
+                cursor.execute('COMMIT;')
 
 def mumble():
     global voiceServer
@@ -1012,7 +1015,7 @@ def saveConfirmationList():
     print confirmationList
 
 def saveStats():
-    global connection, cursor, initTime
+    global connection, initTime
     teamName = ['\x0312blue\x031', '\x034red\x031']
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
@@ -1020,11 +1023,13 @@ def saveStats():
             if len(user['class']) == 0:
                 queryData = '', user['nick'], int(time.time())
             else:
+                cursor = connection.cursor()
                 cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime))
-                connection.commit()
+                cursor.execute('COMMIT;')
 
 def send(message, delay = 0):
-    global connection, cursor
+    global connection
+    cursor = connection.cursor()
     cursor.execute('INSERT INTO messages (message) VALUES (%s)', (message,))
     cursor.execute('COMMIT;')
 
@@ -1074,6 +1079,7 @@ def stats(userName, userCommand):
     if len(commandList) < 2:
         send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!stats\" command. Example : \"!stats nick\".")
         return 0
+    cursor = connection.cursor()
     cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s', (commandList[1],))
     counter = 0
     medicCounter = 0
@@ -1116,13 +1122,14 @@ def sub(userName, userCommand):
     return 0
 
 def updateLast(ip, port, last):
-    global botID, connection, cursor
+    global botID, connection
     ip = getIPFromDNS(ip)
+    cursor = connection.cursor()
     cursor.execute('UPDATE servers SET last = %s, botID = %s WHERE ip = %s and port = %s', (last, botID, ip, port))
-    connection.commit()
+    cursor.execute('COMMIT;')
 
 def updateStats(address, port, score):
-    global connection, cursor, pastGames
+    global connection, pastGames
     for i in reversed(range(len(pastGames))):
         if pastGames[i]['server'] == getIPFromDNS(address) + ':' + port or pastGames[i]['server'] == getDNSFromIP(address) + ':' + port:
             scoreList = score.split(':')
@@ -1137,8 +1144,9 @@ def updateStats(address, port, score):
                 scoreDict['a'] = -1
                 scoreDict['b'] = 1
             for player in pastGames[i]['players']:
+                cursor = connection.cursor()
                 cursor.execute('UPDATE stats SET result = %s WHERE nick = %s AND time = %s', (str(scoreDict[player['team']]), player['nick'], pastGames[i]['time']))
-            connection.commit()
+            cursor.execute('COMMIT;')
             del(pastGames[i])
 
 def updateUserStatus(nick, escapedUserCommand):
@@ -1268,8 +1276,7 @@ readPasswords()
 
 #CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10), botID integer);
 #CREATE TABLE stats (class varchar(255), nick varchar(255), result int, time int);
-connection = psycopg2.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
-cursor = connection.cursor()
+connection = psycopg.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
 
 # Create an IRC object
 irc = irclib.IRC()
