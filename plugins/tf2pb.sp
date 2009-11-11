@@ -1,14 +1,17 @@
+#include <clients>
 #include <socket>
 #include <sdktools_functions>
 #include <sourcemod>
+#include <tf2_stocks>
 
 new String:serverIP[64];
 new String:socketData[192];
 new disconnectedPlayers[32][2];
 new lastGameOver = 0;
 new lastTournamentStateUpdate = 0;
+new players[32][6];
 new String:port[16];
-new String:server[16] = "dallas"; 
+new String:server[16] = "chicago"; 
 
 public Plugin:myinfo =
 {
@@ -18,6 +21,63 @@ public Plugin:myinfo =
 	version = SOURCEMOD_VERSION,
 	url = "http://github.com/550/tf2pb/"
 };
+
+public Action:checkForOffClassPlayers(Handle:timer){
+    new playerCount = GetClientCount();
+    new teamAOffClassPlayers = 0;
+    new teamBOffClassPlayers = 0;
+    for(new i = 1; i <= playerCount; i++)
+    {
+        players[i][0] = i;
+        players[i][2] = 0;
+        players[i][5] = GetClientTeam(i);
+        new classID = GetClassID(i);
+        if(classID != 1 && classID != 3 && classID != 4 && classID != 5)
+        {
+            players[i][1] = players[i][1] + 10;
+            players[i][2] = 1;
+            if(players[i][5] == 2)
+            {
+                teamAOffClassPlayers = teamAOffClassPlayers + 1;
+            }else if(players[i][5] == 3)
+            {
+                teamBOffClassPlayers = teamBOffClassPlayers + 1;
+            }
+        }
+    }
+    new teamWithOffClassPlayers = 0;
+    if(teamAOffClassPlayers > 1)
+    {
+        teamWithOffClassPlayers = 2;
+        if(teamBOffClassPlayers > 1)
+        {
+            teamWithOffClassPlayers = -1;
+        }
+    }else if(teamBOffClassPlayers > 1)
+    {
+        teamWithOffClassPlayers = 3;
+    }
+    for(new i = 1; i <= playerCount; i++)
+    {
+        if(players[i][1] > 0 && players[i][2] == 1 && (players[i][5] == teamWithOffClassPlayers || teamWithOffClassPlayers == -1))
+        {
+            if(players[i][4] == 0)
+            {
+                PrintToChat(i, "Warning! Somebody in your team is already playing offclass but only one is allowed. You or him must switch back to a standard competitive class (demo, medic, scout, soldier) within 2 minutes.");
+                players[i][4] = 1;
+            }else{
+                if(players[i][1] >= 90 && players[i][1] < 120)
+                {
+                    PrintToChat(i, "You have 30 seconds or less to switch back to a standard competitive class (demo, medic, scout, soldier).");
+                }else if(players[i][1] >= 120)
+                {
+                    PrintToChat(i, "Please switch back to a standard competitive class (demo, medic, scout, soldier).");
+                    ForcePlayerSuicide(i);
+                }
+            }
+        }
+    }
+}
 
 public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -88,6 +148,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
 {
     if((GetTime() - lastTournamentStateUpdate) <= 10)
     {
+        CreateTimer(10.0, checkForOffClassPlayers, _, TIMER_REPEAT);
         decl String:record[64] = "tv_record ";
         decl String:time[64];
         FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
@@ -146,6 +207,22 @@ public gameOver()
     }
 }
 
+GetClassID(client) {
+    new class = _:TF2_GetPlayerClass(client);
+    switch(class) {
+        case 1: return 1; // Scout.
+        case 2: return 2; // Sniper.
+        case 3: return 3; // Soldier.
+        case 4: return 4; // Demo.
+        case 5: return 5; // Medic.
+        case 6: return 6; // Heavy.
+        case 7: return 7; // Pyro.
+        case 8: return 8; // Spy.
+        case 9: return 9; // Engie.
+    }
+    return -1;
+}
+
 public OnPluginStart()
 {
     GetConVarString(FindConVar("ip"), serverIP, sizeof(serverIP));
@@ -156,6 +233,12 @@ public OnPluginStart()
     {
         disconnectedPlayers[i][0] = -1;
         disconnectedPlayers[i][1] = 0;
+        players[i][0] = -1; // Player ID.
+        players[i][1] = 0; // Off class timer.
+        players[i][2] = 0; // Actually playing off class.
+        players[i][3] = 0; // Regular warning.
+        players[i][4] = 0; // Dual off class warning.
+        players[i][5] = 0; // Team.
     }
 
     HookEvent("player_disconnect", Event_PlayerDisconnect);
@@ -192,5 +275,5 @@ public sendDataToBot(String:query[])
 {
     new Handle:socket = SocketCreate(SOCKET_TCP, OnSocketError);
     Format(socketData, sizeof(socketData), "%s", query);
-    SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "192.168.1.102", 50007)
+    SocketConnect(socket, OnSocketConnected, OnSocketReceive, OnSocketDisconnected, "bot.tf2pug.org", 50007)
 }
