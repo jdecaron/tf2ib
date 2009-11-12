@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <tf2_stocks>
 
+new Handle:classTimer;
 new String:serverIP[64];
 new String:socketData[192];
 new disconnectedPlayers[32][2];
@@ -61,18 +62,21 @@ public Action:checkForOffClassPlayers(Handle:timer){
     {
         if(players[i][1] > 0 && players[i][2] == 1 && (players[i][5] == teamWithOffClassPlayers || teamWithOffClassPlayers == -1))
         {
-            if(players[i][4] == 0)
+            if(players[i][4] == -1)
             {
-                PrintToChat(i, "Warning! Somebody in your team is already playing offclass but only one is allowed. You or him must switch back to a standard competitive class (demo, medic, scout, soldier) within 2 minutes.");
-                players[i][4] = 1;
+                PrintToChat(i, "Warning! Somebody in your team is already playing offclass but only one is allowed. You or him must switch back to a standard competitive class (demo, medic, scout, soldier) within 5 minutes.");
+                players[i][4] = 0;
             }else{
-                if(players[i][1] >= 90 && players[i][1] < 120)
+                if(players[i][1] >= 300)
                 {
-                    PrintToChat(i, "You have 30 seconds or less to switch back to a standard competitive class (demo, medic, scout, soldier).");
-                }else if(players[i][1] >= 120)
-                {
-                    PrintToChat(i, "Please switch back to a standard competitive class (demo, medic, scout, soldier).");
-                    ForcePlayerSuicide(i);
+                    new availableTime = 60 - players[i][4];
+                    if(players[i][4] < 60){
+                        PrintToChat(i, "You or one of your teammate have %i seconds to switch back to a standard competitive class (demo, medic, scout, soldier).", availableTime);
+                    }else{
+                        PrintToChat(i, "Please switch back to a standard competitive class (demo, medic, scout, soldier).");
+                        ForcePlayerSuicide(i);
+                    }
+                    players[i][4] = players[i][4] + 10;
                 }
             }
         }
@@ -148,7 +152,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
 {
     if((GetTime() - lastTournamentStateUpdate) <= 10)
     {
-        CreateTimer(10.0, checkForOffClassPlayers, _, TIMER_REPEAT);
+        classTimer = CreateTimer(10.0, checkForOffClassPlayers, _, TIMER_REPEAT);
         decl String:record[64] = "tv_record ";
         decl String:time[64];
         FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
@@ -183,6 +187,7 @@ public gameOver()
 {
     if(GetTime() - lastGameOver >= 60)
     {
+        CloseHandle(classTimer);
         new String:blueScore[2];
         new String:redScore[2];
         IntToString(GetTeamScore(3), blueScore, 2);
@@ -237,7 +242,7 @@ public OnPluginStart()
         players[i][1] = 0; // Off class timer.
         players[i][2] = 0; // Actually playing off class.
         players[i][3] = 0; // Regular warning.
-        players[i][4] = 0; // Dual off class warning.
+        players[i][4] = -1; // Dual off class warning.
         players[i][5] = 0; // Team.
     }
 
