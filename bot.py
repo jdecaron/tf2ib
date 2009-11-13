@@ -33,7 +33,7 @@ def add(userName, userCommand):
             if len(userList) >= 12 and classCount('medic') > 1:
                 if len(findAwayUsers()) == 0:
                     initGame()
-                elif awayTimer == 0:
+                else:
                     sendMessageToAwayPlayers()
         elif state == 'scrim':
             if len(userList) == (userLimit - 2) and classCount('medic') == 0 and not isMedic(userCommand):
@@ -45,7 +45,7 @@ def add(userName, userCommand):
             if len(userList) >= 6 and classCount('medic') > 0:
                 if len(findAwayUsers()) == 0:
                     initGame()
-                elif awayTimer == 0:
+                else:
                     sendMessageToAwayPlayers()
         elif state == 'picking' and not isUserCountOverLimit():
             if isInATeam(userName):
@@ -336,16 +336,12 @@ def extractUserName(user):
 
 def findAwayUsers():
     global awayList, userList
-    awayList = {}
-    counter = 0
-    for user in userList:
-        try:
-            if userList[user]['last'] <= (time.time() - (5 * 60)):
+    if type(awayTimer).__name__ == 'float' and time.time() - awayTimer <= (5 * 60):
+        awayList = {}
+    else:
+        for user in userList:
+            if user in userList and userList[user]['last'] <= (time.time() - (30)):
                 awayList[user] = userList[user]
-        except:
-            # Do nothing.
-            1
-    print len(awayList)
     return awayList
 
 def game(userName, userCommand):
@@ -662,9 +658,9 @@ def initGame():
 def initServer():
     global gameServer, lastGame, rconPassword
     try:
+        lastGame = time.time()
         TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
         TF2Server.rcon_command('changelevel ' + getMap())
-        lastGame = time.time()
     except:
         return 0
 
@@ -992,7 +988,9 @@ def removeAwayUsers():
     global awayList, awayTimer
     for user in awayList:
         remove(user)
-    awayTimer = 0
+    awayList = {}
+    awayTimer = time.time()
+    updateUserStatus('', '')
 
 def removeLastEscapeCharacter(userCommand):
     if userCommand[len(userCommand) - 1] == '\\':
@@ -1027,11 +1025,10 @@ def saveStats():
         team = getTeam(teamID)
         for user in team:
             if len(user['class']) == 0:
-                queryData = '', user['nick'], int(time.time())
-            else:
-                cursor = connection.cursor()
-                cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime))
-                cursor.execute('COMMIT;')
+                user['class'] = ['']
+            cursor = connection.cursor()
+            cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime, botID))
+            cursor.execute('COMMIT;')
 
 def send(message, delay = 0):
     global connection
@@ -1040,12 +1037,12 @@ def send(message, delay = 0):
     cursor.execute('COMMIT;')
 
 def sendMessageToAwayPlayers():
-    global awayList, awayTimer, init
+    global awayList, awayTimer
     awayTimer = threading.Timer(60, removeAwayUsers).start()
     if len(awayList) > 1:
         words = ['These players are', 'they don\'t', 'they']
     else:
-        words = ['This player is', 'he doesn\'t', 'they']
+        words = ['This player is', 'he doesn\'t', 'he']
     nickList = []
     for nick in awayList:
         nickList.append(nick)
@@ -1083,7 +1080,7 @@ def stats(userName, userCommand):
         send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!stats\" command. Example : \"!stats nick\".")
         return 0
     cursor = connection.cursor()
-    cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s', (commandList[1],))
+    cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s', (commandList[1], botID))
     counter = 0
     medicCounter = 0
     winCounter = 0
@@ -1154,20 +1151,20 @@ def updateStats(address, port, score):
 
 def updateUserStatus(nick, escapedUserCommand):
     global awayList, userList
-    try:
-        numberOfPlayers = 12
-        if len(captainStageList) == 5:
-            numberOfPlayers = 6
-        if re.search('^\\\\!away', escapedUserCommand):
-            userList[nick]['last'] = time.time() - (10 * 60)
-        else:
+    numberOfMedics = 2
+    numberOfPlayers = 12
+    if len(captainStageList) == 5:
+        numberOfMedics = 1
+        numberOfPlayers = 6
+    if re.search('^\\\\!away', escapedUserCommand) and nick in userList:
+        userList[nick]['last'] = time.time() - (10 * 60)
+    else:
+        if nick in userList:
             userList[nick]['last'] = time.time()
-            if nick in awayList:
-                del awayList[nick]
-            if len(userList) == numberOfPlayers and len(awayList) == 0:
-                initGame()
-    except:
-        return 0
+        if nick in awayList:
+            del awayList[nick]
+        if len(userList) >= numberOfPlayers and len(awayList) == 0 and classCount('medic') >= numberOfMedics:
+            initGame()
 
 def welcome(connection, event):
     global tf2pbPassword
@@ -1269,7 +1266,7 @@ whoisEnded = 0
 readPasswords()
 
 #CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10), botID integer);
-#CREATE TABLE stats (class varchar(255), nick varchar(255), result int, time int);
+#CREATE TABLE stats (class varchar(255), nick varchar(255), result integer, time integer, botID integer);
 connection = psycopg.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
 
 # Create an IRC object
