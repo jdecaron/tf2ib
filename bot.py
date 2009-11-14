@@ -33,7 +33,7 @@ def add(userName, userCommand):
             if len(userList) >= 12 and classCount('medic') > 1:
                 if len(findAwayUsers()) == 0:
                     initGame()
-                else:
+                elif type(awayTimer).__name__ == 'float':
                     sendMessageToAwayPlayers()
         elif state == 'scrim':
             if len(userList) == (userLimit - 2) and classCount('medic') == 0 and not isMedic(userCommand):
@@ -45,7 +45,7 @@ def add(userName, userCommand):
             if len(userList) >= 6 and classCount('medic') > 0:
                 if len(findAwayUsers()) == 0:
                     initGame()
-                else:
+                elif type(awayTimer).__name__ == 'float':
                     sendMessageToAwayPlayers()
         elif state == 'picking' and not isUserCountOverLimit():
             if isInATeam(userName):
@@ -560,7 +560,7 @@ def isAdmin(userName):
         return 1
     else :
     # User is not an admin.
-        return 0 #Debug : 0
+        return 0
 
 def isAdminCommand(userName, userCommand):
     global adminCommands
@@ -1225,7 +1225,7 @@ name = 'BOT'
 adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
 allowFriends = 1
 awayList = {}
-awayTimer = 0
+awayTimer = 0.0
 botID = 0
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
