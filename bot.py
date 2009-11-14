@@ -340,7 +340,7 @@ def findAwayUsers():
         awayList = {}
     else:
         for user in userList:
-            if user in userList and userList[user]['last'] <= (time.time() - (30)):
+            if user in userList and userList[user]['last'] <= (time.time() - (7 * 60)):
                 awayList[user] = userList[user]
     return awayList
 
