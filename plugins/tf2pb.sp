@@ -4,15 +4,21 @@
 #include <sourcemod>
 #include <tf2_stocks>
 
+new allowExtend = 1;
 new Handle:classTimer;
-new String:serverIP[64];
-new String:socketData[192];
+new extendTime = 30;
+new Handle:extendTimer;
 new disconnectedPlayers[32][2];
 new lastGameOver = 0;
+new lastExtendMessage = 0;
+new lastExtension = 0;
 new lastTournamentStateUpdate = 0;
 new players[32][6];
 new String:port[16];
+new regularTime = 30;
 new String:server[16] = "chicago"; 
+new String:serverIP[64];
+new String:socketData[192];
 
 public Plugin:myinfo =
 {
@@ -83,6 +89,17 @@ public Action:checkForOffClassPlayers(Handle:timer){
     }
 }
 
+public Action:checkToExtendTime(Handle:timer){
+    new mapTimeLeft = 0;
+    GetMapTimeLeft(mapTimeLeft);
+    if(mapTimeLeft <= 180 && (GetTime() - lastExtendMessage) > 300)
+    {
+        extendTime = extendTime + 15;
+        lastExtendMessage = GetTime();
+        PrintToChatAll("Only 3 minutes are remaining to this match. Somebody has to type \"!extend\" in the chat to increase the time limit.");
+    }
+}
+
 public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
 {
     new appendedValue = 0;
@@ -125,6 +142,29 @@ public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadc
     decl String:steamID[192];
     GetClientAuthString(GetClientOfUserId(GetEventInt(event, "userid")), steamID, 192);
 
+    if(StrContains(userText, "!cancel") == 0)
+    { 
+        if((GetTime() - lastExtension) <= 300)
+        {
+            allowExtend = 0;
+            ServerCommand("mp_timelimit %i", regularTime);
+        }else if(lastExtension > 0){
+            PrintToChatAll("You can't cancel the time extension after 5 minutes it got extended.");
+        }
+    }
+
+    if(StrContains(userText, "!extend") == 0)
+    { 
+        if(allowExtend == 1)
+        {
+            lastExtension = GetTime();
+            ServerCommand("mp_timelimit %i", extendTime);
+            PrintToChatAll("Somebody extended this match for 15 more minutes. If you disagree with that decision type \"!cancel\" in the chat within the next 5 minutes.");
+        }else{
+            PrintToChatAll("Somebody cancelled the extension, this game can't be extended.");
+        }
+    }
+
     if(StrContains(userText, "!needsub") == 0)
     { 
         decl String:query[192];
@@ -153,6 +193,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
     if((GetTime() - lastTournamentStateUpdate) <= 10)
     {
         classTimer = CreateTimer(10.0, checkForOffClassPlayers, _, TIMER_REPEAT);
+        extendTimer = CreateTimer(10.0, checkToExtendTime, _, TIMER_REPEAT);
         decl String:record[64] = "tv_record ";
         decl String:time[64];
         FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
@@ -188,6 +229,7 @@ public gameOver()
     if(GetTime() - lastGameOver >= 60)
     {
         CloseHandle(classTimer);
+        CloseHandle(extendTimer);
         new String:blueScore[2];
         new String:redScore[2];
         IntToString(GetTeamScore(3), blueScore, 2);
