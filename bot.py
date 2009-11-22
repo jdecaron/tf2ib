@@ -17,7 +17,18 @@ def add(userName, userCommand):
     global state, userList
     print "State : " + state
     if state != 'idle':
-        if state == 'captain' or state == 'normal':
+        if state == 'captain' or state == 'highlander' or state == 'normal':
+            if state == 'highlander' or state == 'normal':
+                if len(userCommand.split()) <= 1:
+                    send("NOTICE " + userName + " : You must specify a class you want to play with. Example : \"!add scout\".")
+                    return 0
+                if len(userCommand.split()) > 2:
+                    send("NOTICE " + userName + " : You can't add as multiple classes in this game mode.")
+                    return 0
+                availableClasses = getAvailableClasses()
+                if userCommand.split()[1] not in availableClasses:
+                    send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(availableClasses) + ".")
+                    return 0
             if len(userList) == (userLimit -2) and classCount('medic') == 0 and not isMedic(userCommand):
                 stats(userName, "!stats " + userName)
                 send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
@@ -30,7 +41,7 @@ def add(userName, userCommand):
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand)
                 printUserList()
-            if len(userList) >= 12 and classCount('medic') > 1:
+            if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
                 if len(findAwayUsers()) == 0:
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
@@ -67,7 +78,7 @@ def addFriend(userName, userCommand):
 
 def addGame(userName, userCommand):
     resetVariables()
-    global allowFriends, gameServer, lastGameType, state
+    global allowFriends, classList, gameServer, lastGameType, state
     # Game server.
     if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
         gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
@@ -77,9 +88,17 @@ def addGame(userName, userCommand):
     # Game type.
     if re.search('captain', userCommand):
         allowFriends = 0
+        classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
+    elif re.search('highlander', userCommand):
+        allowFriends = 0
+        classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
+        lastGameType = 'highlander'
+        state = 'highlander'
     else:
+        allowFriends = 0
+        classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'normal'
         state = 'normal'
     updateLast(gameServer.split(':')[0], gameServer.split(':')[1], -(time.time()))
@@ -131,19 +150,18 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
             team = 'b'
     user['team'] = team
     # Assign the user to the team if the team's not full.
-    if len(getTeam(team)) < 6: # Debug : 6
+    if len(getTeam(team)) < getTeamSize():
         getTeam(team).append(user)
     else:
         getTeam(getOppositeTeam(team)).append(user)
-    if allowFriends and recursiveFriend:
-    # Add friends if allowed to.
+    """if allowFriends and recursiveFriend: # Add friends if allowed to.
         counter = 0
         for friend in userList[user['nick']]['friends']:
             if isUser(friend) and not isMedic(friend):
                 assignUserToTeam('', 0, team, userList[friend])
                 counter += 1
             if counter >= getNumberOfFriendsPerClass(userList[user['nick']]['class']):
-                break
+                break"""
     pastGames[len(pastGames) - 1]['players'].append(userList[user['nick']])
     del userList[user['nick']]
     return 0
@@ -163,11 +181,12 @@ def autoGameStart():
 def buildTeams():
     global allowFriends, state, userList
     state = 'idle'
-    assignUserToTeam('medic', 1, 'a', userList[getAPlayer('medic')])
-    assignUserToTeam('medic', 1, 'b', userList[getAPlayer('medic')])
-    for i in range(10): #Debug : 10
-        if len(getTeam('a')) < 6 or len(getTeam('b')) < 6:
-            assignUserToTeam('', 1, 0, userList[getAPlayer('')])
+    fullClassList = classList
+    if getTeamSize() == 6:
+        fullClassList = formalTeam
+    for team in ['a', 'b']:
+        for gameClass in fullClassList:
+            assignUserToTeam(gameClass, 0, team, userList[getAPlayer(gameClass)])
     startGame()
 
 def captain():
@@ -216,9 +235,7 @@ def createUser(userName, userCommand):
     user['last'] = time.time()
     if (getUserCount() + 1) > 12:
         user['late'] = 1
-    classes = extractClasses(userCommand)
-    if state != 'normal' or 'medic' in classes:
-        user['class'] = classes
+    user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
         user['status'] = 'captain'
     user['nick'] = userName
@@ -396,23 +413,26 @@ def getAPlayer(playerType):
             player['class'] = ['medic']
         return player
     else:
-        for i in range(5):
-            candidateList = []
-            forcedList = []
-            for user in userList.copy():
-                if len(userList[user]['class']) > i and playerType == userList[user]['class'][i]:
-                    candidateList.append(user)
-                else:
-                    forcedList.append(user)
-            if len(candidateList) != 0:
-                if len(candidateList) > 1:
-                    return candidateList[random.randint(0,len(candidateList) - 1)]
-                else:
-                    return candidateList[0]
-        if len(forcedList) > 1:
-            return forcedList[random.randint(0,len(forcedList) - 1)]
+        forcedList = []
+        candidateList = []
+        for user in userList.copy():
+            forcedList.append(user)
+            if len(userList[user]['class']) > 0 and playerType == userList[user]['class'][0]:
+                candidateList.append(user)
+        if len(candidateList) > 0:
+            return getRandomItemFromList(candidateList)
         else:
-            return forcedList[0]
+            return getRandomItemFromList(forcedList)
+
+def getAvailableClasses():
+    availableClasses = []
+    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+    if getTeamSize() == 9:
+        numberOfPlayersPerClass = {'demo':2, 'engineer':2, 'heavy':2, 'medic':2, 'pyro':2, 'scout':2, 'sniper':2, 'soldier':2, 'spy':2}
+    for gameClass in classList:
+        if classCount(gameClass) < numberOfPlayersPerClass[gameClass]:
+            availableClasses.append(gameClass)
+    return availableClasses
 
 def getAvailableServer():
     for server in getServerList():
@@ -533,6 +553,12 @@ def getTeam(team):
     else:
         return teamB
 
+def getTeamSize():
+    teamSize = 6
+    if len(classList) == 9:
+        teamSize = 9
+    return teamSize
+
 def getUserCount():
     global teamA, teamB, userList
     teams = [teamA, teamB]
@@ -638,7 +664,8 @@ def initGame():
         return 0
     initTime = int(time.time())
     pastGames.append({'players':[], 'server':gameServer, 'time':initTime})
-    if state == "normal":
+    if state == "normal" or state == "highlander":
+        send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'building'
         initTimer = threading.Timer(20, buildTeams)
         initTimer.start()
@@ -880,7 +907,7 @@ def printCaptainChoices(printType = 'private'):
         if userList[userName]['late'] == 1:
             late = 'L'
         choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
-    send(dataPrefix + "All players : " + ', '.join(choiceList)) 
+    send(dataPrefix +  str(len(choiceList))+ " user(s) : " + ', '.join(choiceList)) 
 
 def printSubs():
     global subList
@@ -1156,6 +1183,8 @@ def updateUserStatus(nick, escapedUserCommand):
     if len(captainStageList) == 5:
         numberOfMedics = 1
         numberOfPlayers = 6
+    elif getTeamSize() == 9:
+        numberOfPlayers = 18
     if re.search('^\\\\!away', escapedUserCommand) and nick in userList:
         userList[nick]['last'] = time.time() - (10 * 60)
     else:
