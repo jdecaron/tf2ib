@@ -1,4 +1,5 @@
 #include <clients>
+#include <menus>
 #include <socket>
 #include <sdktools_functions>
 #include <sourcemod>
@@ -13,9 +14,11 @@ new lastGameOver = 0;
 new lastExtendMessage = 0;
 new lastExtension = 0;
 new lastTournamentStateUpdate = 0;
-new players[32][6];
+new String:map[64];
+new players[32][7];
 new String:port[16];
 new regularTime = 30;
+new restricted[16];
 new String:server[16] = "chicago"; 
 new String:serverIP[64];
 new String:socketData[192];
@@ -66,7 +69,18 @@ public Action:checkForOffClassPlayers(Handle:timer){
     }
     for(new i = 1; i <= playerCount; i++)
     {
-        if(players[i][1] > 0 && players[i][2] == 1 && (players[i][5] == teamWithOffClassPlayers || teamWithOffClassPlayers == -1))
+        if(players[i][6] == -1 && players[i][2] == 1)
+        {
+            new availableTime = 120 - players[i][4];
+            if(players[i][4] < 120){
+                PrintToChat(i, "You have %i seconds to switch back to a standard competitive class (demo, medic, scout, soldier).", availableTime);
+            }else{
+                PrintToChat(i, "Please switch back to a standard competitive class (demo, medic, scout, soldier).");
+                ForcePlayerSuicide(i);
+            }
+            players[i][4] = players[i][4] + 10;
+        }
+        else if(classRestrictionEnabled() && players[i][1] > 0 && players[i][2] == 1 && (players[i][5] == teamWithOffClassPlayers || teamWithOffClassPlayers == -1))
         {
             if(players[i][4] == -1)
             {
@@ -100,6 +114,15 @@ public Action:checkToExtendTime(Handle:timer){
     }
 }
 
+public classRestrictionEnabled()
+{
+    if(StrContains(map, "cp_badlands") == 0 || StrContains(map, "cp_granary") == 0)
+    {
+        return 1
+    }
+    return 0
+}
+
 public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
 {
     new appendedValue = 0;
@@ -130,8 +153,36 @@ public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadc
     }
 }
 
+public RestrictMenuCallback(Handle:menu, MenuAction:action, param1, param2)
+{
+    if (action == MenuAction_Select)
+    {
+        if(TF2_GetPlayerClass(param1) == 5)
+        {
+            PrintToChat(param1, "Class restriction applied.");
+            players[restricted[param2]][6] = -1;
+        }
+        else if(players[restricted[param2]][6] > 0 && players[restricted[param2]][6] != param1)
+        {
+            PrintToChat(param1, "Class restriction applied.");
+            players[restricted[param2]][6] = -1
+        }
+        else if(players[restricted[param2]][6] != -1)
+        {
+            PrintToChat(param1, "One more player in your team has to vote for a restriction on this player to make it effective.");
+            players[restricted[param2]][6] = param1;
+        }
+    }
+    else if(action == MenuAction_End)
+    {
+        CloseHandle(menu);
+    }
+}
+
 public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadcast)
 {
+    new client = GetClientOfUserId(GetEventInt(event, "userid"));
+    new team = GetClientTeam(client);
 	decl String:userText[192];
     userText[0] = '\0';
 	if (!GetEventString(event, "text", userText, 192))
@@ -140,9 +191,9 @@ public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadc
 	}
 
     decl String:steamID[192];
-    GetClientAuthString(GetClientOfUserId(GetEventInt(event, "userid")), steamID, 192);
+    GetClientAuthString(client, steamID, 192);
 
-    if(StrContains(userText, "!cancel") == 0)
+    if(StrContains(userText, "!cancel") == 0 && (team == 2 || team == 3))
     { 
         if((GetTime() - lastExtension) <= 300)
         {
@@ -180,6 +231,11 @@ public Action:Event_PlayerSay(Handle:event, const String:name[], bool:dontBroadc
         sendDataToBot(query);
     }
 	
+    if(StrContains(userText, "!restrict") == 0)
+    { 
+        restrictClass(client);
+    }
+
 	return Plugin_Continue;	
 }
 
@@ -192,8 +248,22 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
 {
     if((GetTime() - lastTournamentStateUpdate) <= 10)
     {
+        for(new i = 0; i < 32; i++)
+        {
+            disconnectedPlayers[i][0] = -1;
+            disconnectedPlayers[i][1] = 0;
+            players[i][0] = -1; // Player ID.
+            players[i][1] = 0; // Off class timer.
+            players[i][2] = 0; // Actually playing off class.
+            players[i][3] = 0; // Regular warning.
+            players[i][4] = -1; // Dual off class warning.
+            players[i][5] = 0; // Team.
+            players[i][6] = 0; // Restriction (0 = no restriction, -1 = restricted, above 0 = user ID which want a restriction).
+        }
+
         classTimer = CreateTimer(10.0, checkForOffClassPlayers, _, TIMER_REPEAT);
         extendTimer = CreateTimer(10.0, checkToExtendTime, _, TIMER_REPEAT);
+        GetCurrentMap(map, 64);
         decl String:record[64] = "tv_record ";
         decl String:time[64];
         FormatTime(time, 64, "%Y-%m-%d-%Hh%Mm");
@@ -204,7 +274,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
         ServerCommand("tv_stoprecord");
         ServerCommand(record);
         PrintToChatAll("%s", record);
-        PrintToChatAll("Live!");
+        PrintToChatAll("Live! During this match you can restrict off classing by typing \"!restrict\" in the chat or in the console.");
     }
 }
 
@@ -276,18 +346,6 @@ public OnPluginStart()
     IntToString(GetConVarInt(FindConVar("hostport")), port, 10)
     lastTournamentStateUpdate = 0;
 
-    for(new i = 32; i < 32; i++)
-    {
-        disconnectedPlayers[i][0] = -1;
-        disconnectedPlayers[i][1] = 0;
-        players[i][0] = -1; // Player ID.
-        players[i][1] = 0; // Off class timer.
-        players[i][2] = 0; // Actually playing off class.
-        players[i][3] = 0; // Regular warning.
-        players[i][4] = -1; // Dual off class warning.
-        players[i][5] = 0; // Team.
-    }
-
     HookEvent("player_disconnect", Event_PlayerDisconnect);
     HookEvent("player_say", Event_PlayerSay);
     HookEvent("teamplay_game_over", Event_TeamplayGameOver);
@@ -295,6 +353,7 @@ public OnPluginStart()
     HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
     HookEvent("tf_game_over", Event_TeamplayGameOver);
     HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
+    RegConsoleCmd("!restrict", console_restrictClasses);
 }
 
 public OnSocketConnected(Handle:socket, any:arg){
@@ -316,6 +375,35 @@ public OnSocketReceive(Handle:socket, String:receiveData[], const dataSize, any:
 public OnSocketSendqueueEmpty(Handle:socket, any:arg){
     SocketDisconnect(socket);
     CloseHandle(socket);
+}
+
+public Action:console_restrictClasses(client, args)
+{
+    restrictClass(client);
+}
+
+public restrictClass(client)
+{
+    new Handle:menu = CreateMenu(RestrictMenuCallback);
+    SetMenuTitle(menu, "Select the player you want to restrict his class :");
+    new team = GetClientTeam(client);
+    new String:clientFromList[4];
+    new String:clientName[32];
+    new itemCounter = 0;
+    for(new i = 1; i <= GetClientCount(); i++)
+    {
+
+        if(i != client && team == GetClientTeam(i))
+        {
+            restricted[itemCounter] = i;
+            GetClientName(i, clientName, 32);
+            IntToString(i, clientFromList, 4);
+            AddMenuItem(menu, clientFromList, clientName);
+            itemCounter = itemCounter + 1;
+        }
+    }
+    SetMenuExitButton(menu, false);
+    DisplayMenu(menu, client, MENU_TIME_FOREVER);
 }
 
 public sendDataToBot(String:query[])
