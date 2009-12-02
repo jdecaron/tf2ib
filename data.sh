@@ -5,6 +5,7 @@ do
     if test -z `fuser $i`
     then
         mv $i ./demos
-        rsync -a ./demos/ tf2pug@tf2pug.org:~/demos.tf2pug.org
     fi
 done
+rsync -a --bwlimit=600 ./demos/ tf2pug@tf2pug.org:~/demos.tf2pug.org
+rsync -a --bwlimit=600 ./logs/ tf2pug@tf2pug.org:~/stats.tf2pug.org/logs
