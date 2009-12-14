@@ -1,14 +1,15 @@
-#!/usr/bin/python2.6
+#!/usr/bin/python
 
 import irclib
-import psycopg2
+import psycopg
 import sys
 import time
 
-#irclib.DEBUG = 1
+irclib.DEBUG = 1
 
 def welcome(connection, event):
-    server.join(channel)
+    server.join("#tf2.pug")
+    server.join("#tf2.pug.na")
 
 nick = ''
 ip = ''
@@ -26,7 +27,7 @@ finally:
     passwordFile.close()
 
 # Connection information
-network = 'NuclearFallout.WA.US.GameSurge.net'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 channel = '#tf2.pug.na'
 name = 'BOT'
@@ -40,7 +41,7 @@ server.connect(network, port, nick, ircname = name, localaddress = ip)
 irc.add_global_handler('welcome', welcome)
 
 #CREATE TABLE messages(id SERIAL PRIMARY KEY, message TEXT);
-database = psycopg2.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
+database = psycopg.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
 cursor = database.cursor()
 
 while 1:

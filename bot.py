@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6
+#!/usr/bin/python
 
 import irclib
 import math
@@ -224,7 +224,7 @@ def clearCaptainsFromTeam(team):
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name)
+    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
 
 def createUser(userName, userCommand):
     global classList, state
@@ -372,7 +372,7 @@ def game(userName, userCommand):
         return 0
     if mode[1] == 'captain':
         if state == 'scrim':
-            captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+            captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
             state = 'captain'
         else:
             send("NOTICE " + userName + " :You can't switch the game mode in this bot state.")
@@ -776,6 +776,7 @@ def needsub(userName, userCommand):
         # Set the server IP.
         if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]$", command):
             sub['server'] = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", command)[0]
+            sub['server'] = getDNSFromIP(sub['server'].split(':')[0]) + ':' + sub['server'].split(':')[1]
         # Set the Steam ID.
         if re.search("STEAM", command):
             sub['steamid'] = command
@@ -1034,7 +1035,7 @@ def resetVariables():
     global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
-    captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+    captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
     gameServer = ''
     teamA = []
     teamB = []
@@ -1073,9 +1074,9 @@ def sendMessageToAwayPlayers():
     nickList = []
     for nick in awayList:
         nickList.append(nick)
-    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 " + words[0] + " considered as innactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
+    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 " + words[0] + " considered as inactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
     for user in awayList:
-        send("PRIVMSG " + user + ' :Warning, you are considered as innactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
+        send("PRIVMSG " + user + ' :Warning, you are considered as inactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
 
 def sendStartPrivateMessages():
     color = ['\x0312', '\x034']
@@ -1245,7 +1246,7 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = 'NuclearFallout.WA.US.GameSurge.net'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -1257,7 +1258,7 @@ awayList = {}
 awayTimer = 0.0
 botID = 0
 captainStage = 0
-captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
 connectTimer = threading.Timer(0, None)
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
@@ -1287,7 +1288,7 @@ userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captai
 userAuth = []
 userChannel = []
 userInfo = []
-userLimit = 14
+userLimit = 20
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
