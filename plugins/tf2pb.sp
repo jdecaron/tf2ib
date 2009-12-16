@@ -19,7 +19,7 @@ new players[32][7];
 new String:port[16];
 new regularTime = 30;
 new restricted[16];
-new String:server[16] = "chicago"; 
+new String:server[16] = "chicago1"; 
 new String:serverIP[64];
 new String:socketData[192];
 
@@ -38,10 +38,13 @@ public Action:checkForOffClassPlayers(Handle:timer){
     new teamBOffClassPlayers = 0;
     for(new i = 1; i <= playerCount; i++)
     {
+        new classID = -1;
         players[i][0] = i;
         players[i][2] = 0;
-        players[i][5] = GetClientTeam(i);
-        new classID = GetClassID(i);
+        if(IsValidEntity(i) && IsClientInGame(i)){
+            classID = TF2_GetPlayerClass(i);
+            players[i][5] = GetClientTeam(i);
+        }
         if(classID != 1 && classID != 3 && classID != 4 && classID != 5)
         {
             players[i][1] = players[i][1] + 10;
@@ -69,6 +72,9 @@ public Action:checkForOffClassPlayers(Handle:timer){
     }
     for(new i = 1; i <= playerCount; i++)
     {
+        if(!IsClientInGame(i)){
+            continue;
+        }
         if(players[i][6] == -1 && players[i][2] == 1)
         {
             new availableTime = 120 - players[i][4];
@@ -89,8 +95,8 @@ public Action:checkForOffClassPlayers(Handle:timer){
             }else{
                 if(players[i][1] >= 300)
                 {
-                    new availableTime = 60 - players[i][4];
-                    if(players[i][4] < 60){
+                    new availableTime = 120 - players[i][4];
+                    if(players[i][4] < 120){
                         PrintToChat(i, "You or one of your teammate have %i seconds to switch back to a standard competitive class (demo, medic, scout, soldier).", availableTime);
                     }else{
                         PrintToChat(i, "Please switch back to a standard competitive class (demo, medic, scout, soldier).");
@@ -123,10 +129,11 @@ public classRestrictionEnabled()
     return 0
 }
 
-public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadcast)
+public OnClientDisconnect(client)
 {
     new appendedValue = 0;
     new disconnectedCounter = 0;
+    logMedicStats(client);
     for(new i = 0; i < 32; i++)
     {
         if(GetTime() - disconnectedPlayers[i][1] <= 1 * 60)
@@ -140,7 +147,7 @@ public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadc
 
         if(!appendedValue && disconnectedPlayers[i][0] == -1)
         {
-            disconnectedPlayers[i][0] = GetEventInt(event, "userid");
+            disconnectedPlayers[i][0] = client;
             disconnectedPlayers[i][1] = GetTime();
             disconnectedCounter++;
             appendedValue = 1;
@@ -150,6 +157,31 @@ public Event_PlayerDisconnect(Handle:event, const String:name[], bool:dontBroadc
     if(disconnectedCounter == 6)
     {
         gameOver();
+    }
+}
+
+public logMedicStats(client){
+    if(IsValidEntity(client) && TF2_GetPlayerClass(client) == 5)
+    {
+        new healing = 0;
+        decl String:steamid[64];
+        decl String:name[32];
+        decl Int:userId;
+        new score = 0;
+        healing = GetEntProp(client, Prop_Send, "m_iHealPoints");
+        score = TF2_GetPlayerResourceData(client, TFResource_TotalScore);
+        GetClientAuthString(client, steamid, sizeof(steamid));
+        GetClientName(client, name, sizeof(name));
+        userId = GetClientUserId(client);
+        decl String:team[64];
+        GetTeamName(GetClientTeam(client), team, sizeof(team));
+        LogToGame("\"%s<%d><%s><%s>\" triggered \"medic_stats\" %d %d",
+            name,
+            userId,
+            steamid,
+            team,
+            score,
+            healing) ;
     }
 }
 
@@ -273,6 +305,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
         StrCat(record, 64, port);
         ServerCommand("tv_stoprecord");
         ServerCommand(record);
+        LogToGame("%s", record);
         PrintToChatAll("%s", record);
         PrintToChatAll("Live! During this match you can restrict off classing by typing \"!restrict\" in the chat or in the console.");
     }
@@ -298,6 +331,10 @@ public gameOver()
 {
     if(GetTime() - lastGameOver >= 60)
     {
+        for(new i = 1; i <= GetClientCount(); i++)
+        {
+            logMedicStats(i);
+        }
         CloseHandle(classTimer);
         CloseHandle(extendTimer);
         new String:blueScore[2];
@@ -305,6 +342,7 @@ public gameOver()
         IntToString(GetTeamScore(3), blueScore, 2);
         IntToString(GetTeamScore(2), redScore, 2);
         lastGameOver = GetTime();
+        ServerCommand("log off");
         ServerCommand("tv_stoprecord");
         decl String:query[192];
         query = "";
@@ -324,29 +362,12 @@ public gameOver()
     }
 }
 
-GetClassID(client) {
-    new class = _:TF2_GetPlayerClass(client);
-    switch(class) {
-        case 1: return 1; // Scout.
-        case 2: return 2; // Sniper.
-        case 3: return 3; // Soldier.
-        case 4: return 4; // Demo.
-        case 5: return 5; // Medic.
-        case 6: return 6; // Heavy.
-        case 7: return 7; // Pyro.
-        case 8: return 8; // Spy.
-        case 9: return 9; // Engie.
-    }
-    return -1;
-}
-
 public OnPluginStart()
 {
     GetConVarString(FindConVar("ip"), serverIP, sizeof(serverIP));
     IntToString(GetConVarInt(FindConVar("hostport")), port, 10)
     lastTournamentStateUpdate = 0;
 
-    HookEvent("player_disconnect", Event_PlayerDisconnect);
     HookEvent("player_say", Event_PlayerSay);
     HookEvent("teamplay_game_over", Event_TeamplayGameOver);
     HookEvent("teamplay_restart_round", Event_TeamplayRestartRound);
@@ -384,6 +405,7 @@ public Action:console_restrictClasses(client, args)
 
 public restrictClass(client)
 {
+    PrintToChat(client, "Restrict!");
     new Handle:menu = CreateMenu(RestrictMenuCallback);
     SetMenuTitle(menu, "Select the player you want to restrict his class :");
     new team = GetClientTeam(client);
@@ -403,7 +425,7 @@ public restrictClass(client)
         }
     }
     SetMenuExitButton(menu, false);
-    DisplayMenu(menu, client, MENU_TIME_FOREVER);
+    DisplayMenu(menu, client, 10);
 }
 
 public sendDataToBot(String:query[])
