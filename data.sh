@@ -8,10 +8,17 @@ touch /tmp/tf2pb
 cd /usr/local/games/steam/orangebox/tf
 for i in `find -maxdepth 1 -name "*\.dem"`
 do
+    # Backup the demo files that are done recording.
     if test -z `fuser $i`
     then
         mv $i ./demos
     fi
+done
+for i in `find ./logs -name '*.log' | grep 'L.*[0-9]\.log'`;
+do
+    # Prepend the server name to the logs to guarantee they have unique files names in the stats page.
+    j=`echo $i | cut -dL -f2`;
+    mv $i ./logs/'chicago1_'$j;
 done
 rsync -a --bwlimit=600 --max-size=30000000 ./demos/ tf2pug@tf2pug.org:~/demos.tf2pug.org
 rsync -a --bwlimit=600 --max-size=30000000 ./logs/ tf2pug@tf2pug.org:~/stats.tf2pug.org/logs
