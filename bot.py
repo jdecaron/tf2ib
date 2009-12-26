@@ -78,7 +78,7 @@ def addFriend(userName, userCommand):
 
 def addGame(userName, userCommand):
     resetVariables()
-    global allowFriends, classList, gameServer, lastGameType, state
+    global allowFriends, classList, gameServer, lastGameType, state, userLimit
     # Game server.
     if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
         gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
@@ -91,16 +91,19 @@ def addGame(userName, userCommand):
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
+        userLimit = 20
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
         lastGameType = 'highlander'
         state = 'highlander'
+        userLimit = 18
     else:
         allowFriends = 0
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'normal'
         state = 'normal'
+        userLimit = 12
     updateLast(gameServer.split(':')[0], gameServer.split(':')[1], -(time.time()))
     send("PRIVMSG " + channel + ' :\x030,01PUG started. Game type : ' + state + '. Type "!add" to join a game.')
 
