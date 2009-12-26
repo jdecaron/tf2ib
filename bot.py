@@ -150,18 +150,10 @@ def assignUserToTeam(gameClass, recursiveFriend, team, user):
             team = 'b'
     user['team'] = team
     # Assign the user to the team if the team's not full.
-    if len(getTeam(team)) < getTeamSize():
+    if len(getTeam(team)) < getTeamSize(): # Debug : 6
         getTeam(team).append(user)
     else:
         getTeam(getOppositeTeam(team)).append(user)
-    """if allowFriends and recursiveFriend: # Add friends if allowed to.
-        counter = 0
-        for friend in userList[user['nick']]['friends']:
-            if isUser(friend) and not isMedic(friend):
-                assignUserToTeam('', 0, team, userList[friend])
-                counter += 1
-            if counter >= getNumberOfFriendsPerClass(userList[user['nick']]['class']):
-                break"""
     pastGames[len(pastGames) - 1]['players'].append(userList[user['nick']])
     del userList[user['nick']]
     return 0
@@ -179,15 +171,14 @@ def autoGameStart():
         addGame(nick, '!addgame ' + lastGameType + ' ' + server['ip'] + ':' + server['port'])
 
 def buildTeams():
-    global allowFriends, state, userList
-    state = 'idle'
+    global allowFriends, userList
     fullClassList = classList
     if getTeamSize() == 6:
         fullClassList = formalTeam
     for team in ['a', 'b']:
         for gameClass in fullClassList:
             assignUserToTeam(gameClass, 0, team, userList[getAPlayer(gameClass)])
-    startGame()
+    printTeams()
 
 def captain():
     global teamA, teamB
@@ -224,7 +215,7 @@ def clearCaptainsFromTeam(team):
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
+    server.connect(network, port, nick, ircname = name)
 
 def createUser(userName, userCommand):
     global classList, state
@@ -280,6 +271,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!endgame', escapedUserCommand):
         endGame()
         return 0
+    if re.search('^\\\\!force', escapedUserCommand):
+        force(userName)
+        return 0
     if re.search('^\\\\!game', escapedUserCommand):
         game(userName, userCommand)
         return 0
@@ -325,6 +319,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!restart', escapedUserCommand):
         restartBot()
         return 0
+    if re.search('^\\\\!scramble', escapedUserCommand):
+        scramble(userName)
+        return 0
     if re.search('^\\\\!stats', escapedUserCommand):
         stats(userName, userCommand)
         return 0
@@ -360,6 +357,9 @@ def findAwayUsers():
             if user in userList and userList[user]['last'] <= (time.time() - (7 * 60)):
                 awayList[user] = userList[user]
     return awayList
+
+def force(userName):
+    scramble(userName, 1)
 
 def game(userName, userCommand):
     global captainStageList, state
@@ -659,16 +659,20 @@ def isUser(userName):
         return 0
 
 def initGame():
-    global gameServer, initTime, initTimer, nick, pastGames, state, teamA, teamB
+    global gameServer, initTime, initTimer, nick, pastGames, scrambleList, startGameTimer, state, teamA, teamB
     if state == 'building' or state == 'picking':
         return 0
     initTime = int(time.time())
     pastGames.append({'players':[], 'server':gameServer, 'time':initTime})
     if state == "normal" or state == "highlander":
+        scrambleList = []
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
+        send("PRIVMSG " + channel + " :\x037,01If you find teams unfair you can type \"!scramble\" and they will be adjusted.")
         state = 'building'
         initTimer = threading.Timer(20, buildTeams)
         initTimer.start()
+        startGameTimer = threading.Timer(100, startGame)
+        startGameTimer.start()
     elif state == "captain":
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
@@ -686,8 +690,8 @@ def initServer():
     global gameServer, lastGame, rconPassword
     try:
         lastGame = time.time()
-        TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
-        TF2Server.rcon_command('changelevel ' + getMap())
+        #TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
+        #TF2Server.rcon_command('changelevel ' + getMap())
     except:
         return 0
 
@@ -872,7 +876,6 @@ def pick(userName, userCommand):
             captainStage += 1
             printCaptainChoices()
         else:
-            state = 'idle'
             startGame()
     else:
         send("NOTICE " + userName + " : It is not your turn, or you are not authorized to pick a player.") 
@@ -1058,6 +1061,26 @@ def saveStats():
             cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime, botID))
             cursor.execute('COMMIT;')
 
+def scramble(userName, force = 0):
+    global scrambleList, teamA, teamB, userList
+    if len(teamA) == 0:
+        send("NOTICE " + userName + " :Wait until the teams are drafted to use this command.")
+        return 0
+    if not startGameTimer.isAlive():
+        send("NOTICE " + userName + " :You have a maximum of 1 minute after the teams got originally drafted to use this command.")
+        return 0
+    if (len(scrambleList) == 2 and userName not in scrambleList) or force:
+        scrambleList = []
+        teamA = []
+        teamB = []
+        pastGameIndex = len(pastGames) - 1
+        for i in pastGames[pastGameIndex]['players']:
+            userList[i['nick']] = i
+        buildTeams()
+        send("PRIVMSG " + channel + " :\x037,01Teams got scrambled.")
+    elif userName not in scrambleList:
+        scrambleList.append(userName)
+
 def send(message, delay = 0):
     global connection
     cursor = connection.cursor()
@@ -1095,8 +1118,10 @@ def setStartMode(mode):
     startMode = mode
 
 def startGame():
-    global gameServer, initTime
-    printTeams()
+    global gameServer, initTime, state
+    state = 'idle'
+    if lastGameType != 'normal' and lastGameType != 'highlander':
+        printTeams()
     initServer()
     saveStats()
     sendStartPrivateMessages()
@@ -1246,13 +1271,13 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = 'Gameservers.NJ.US.GameSurge.net'
+network = '192.168.1.102'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
+adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!force", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
 allowFriends = 1
 awayList = {}
 awayTimer = 0.0
@@ -1267,7 +1292,7 @@ gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "
 initTime = int(time.time())
 initTimer = threading.Timer(0, None)
 lastGame = 0
-lastGameType = "captain"
+lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
 mapList = ["cp_badlands", "cp_granary"]
@@ -1282,9 +1307,11 @@ state = 'idle'
 teamA = []
 teamB = []
 restart = 0
+scrambleList = []
+startGameTimer = threading.Timer(0, None)
 subList = []
 tf2pbPassword = ''
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
