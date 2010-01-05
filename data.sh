@@ -23,5 +23,5 @@ done
 rsync -a --bwlimit=600 --max-size=30000000 ./demos/ tf2pug@tf2pug.org:~/demos.tf2pug.org
 rsync -a --bwlimit=600 --max-size=30000000 ./logs/ tf2pug@tf2pug.org:~/stats.tf2pug.org/logs
 for i in `find ./demos/ -maxdepth 1 -type f -mtime +1`; do rm $i; done
-for i in `find ./logs/ -maxdepth 1 -type f -mtime +1`; do rm $i; done
+for i in `find ./logs/ -maxdepth 1 -type f -mtime +7`; do rm $i; done
 rm /tmp/tf2pb
