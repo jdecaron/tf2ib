@@ -218,7 +218,7 @@ def clearCaptainsFromTeam(team):
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name)
+    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
 
 def createUser(userName, userCommand):
     global classList, state
@@ -573,6 +573,13 @@ def getUserCount():
         teamCounter += 1
     return counter
 
+def getWinStats(userName):
+    cursor = connection.cursor()
+    cursor.execute('SELECT nick, count(*), sum(result) FROM stats WHERE nick ILIKE %s GROUP BY nick', (userName,))
+    for row in cursor.fetchall():
+        return row
+    return 0
+
 def help():
     send("PRIVMSG " + channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
 
@@ -693,8 +700,8 @@ def initServer():
     global gameServer, lastGame, rconPassword
     try:
         lastGame = time.time()
-        #TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
-        #TF2Server.rcon_command('changelevel ' + getMap())
+        TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), rconPassword, 10)
+        TF2Server.rcon_command('changelevel ' + getMap())
     except:
         return 0
 
@@ -772,7 +779,7 @@ def listeningTF2Servers():
 
 def mumble():
     global voiceServer
-    message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://internap.dl.sourceforge.net/sourceforge/mumble/Mumble-1.1.8.exe"
+    message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://downloads.sourceforge.net/project/mumble/Mumble/1.2.1/Mumble-1.2.1.exe"
     send("PRIVMSG " + channel + " :" + message)
 
 def needsub(userName, userCommand):
@@ -902,10 +909,13 @@ def printCaptainChoices(printType = 'private'):
         choiceList = []
         for userName in userList.copy():
             if gameClass in userList[userName]['class']:
+                captain = ''
                 late = ''
+                if re.search('captain', userList[userName]['command']):
+                    captain = 'C'
                 if userList[userName]['late'] == 1:
                     late = 'L'
-                choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
+                choiceList.append("(" + str(getPlayerNumber(userName)) + captain + late + ")" + userName)
         if len(choiceList):
             send(dataPrefix + gameClass.capitalize() + "s: " + ', '.join(choiceList)) 
     choiceList = []
@@ -913,13 +923,13 @@ def printCaptainChoices(printType = 'private'):
         late = ''
         if userList[userName]['late'] == 1:
             late = 'L'
-        choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
+        choiceList.append("(" + str(getPlayerNumber(userName)) + captain + late + ")" + userName)
     send(dataPrefix +  str(len(choiceList))+ " user(s) : " + ', '.join(choiceList)) 
 
 def printSubs():
     global subList
     if len(subList):
-        send("PRIVMSG " + channel + " :" + "\x030,01Substitute(s) needed:")
+        send("PRIVMSG " + channel + " :" + "\x037,01Substitute(s) needed:")
         for sub in subList:
             by = ''
             if sub['steamid'] != '':
@@ -946,6 +956,33 @@ def printTeams():
             message += '"' + user['nick'] + gameClass + '" '
         send("PRIVMSG " + channel + " :" + message)
         counter += 1
+    printTeamsHandicaps()
+
+def printTeamsHandicaps():
+    gamesPlayedCounter = [0, 0]
+    handicapTotal = [0, 0]
+    for user in pastGames[len(pastGames) - 1]['players']:
+        stats = getWinStats(user['nick'])
+        if stats:
+            gamesPlayed = stats[1]
+            handicap = stats[2]
+            if gamesPlayed > 20:
+                handicap = (handicap * 20) / gamesPlayed
+                gamesPlayed = 20
+            if user['team'] == 'a':
+                teamIndex = 0
+            else:
+                teamIndex = 1
+            gamesPlayedCounter[teamIndex] = gamesPlayedCounter[teamIndex] + gamesPlayed
+            handicapTotal[teamIndex] = handicapTotal[teamIndex] + handicap
+    victoriesTotal = [0, 0]
+    winRatioOverall = [0, 0]
+    for teamIndex in range(2):
+        victoriesTotal[teamIndex] = (gamesPlayedCounter[teamIndex]/2) + handicapTotal[teamIndex]
+        winRatioOverall[teamIndex] = 100 * float(float(victoriesTotal[teamIndex])/float(gamesPlayedCounter[teamIndex]))
+    print winRatioOverall
+    if abs(winRatioOverall[0] - winRatioOverall[1]) >= 15:
+        send("PRIVMSG " + channel + " :\x038,01According to the Saucier2000 algorythm the teams aren't fair, \"!scramble\" them.")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -961,9 +998,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    print state
-    print pastGames
-    print awayList
+    printTeamsHandicaps()
 
 def readPasswords():
     global rconPassword, tf2pbPassword
@@ -1112,7 +1147,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"" + color[teamCounter] + "connect " + gameServer + "; password " + password + ";\x031\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"" + color[teamCounter] + "connect " + gameServer + "; password " + password + ";\x031\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug\".")
             userCounter += 1
         teamCounter += 1
 
@@ -1173,7 +1208,7 @@ def sub(userName, userCommand):
         send("NOTICE " + userName + " :You must supply a valid substitute ID. Example : \"!sub 1\".")
         return 0
     subIndex = getSubIndex(id)
-    send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
+    send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug\".")
     del(subList[subIndex])
     return 0
 
@@ -1274,17 +1309,17 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = '192.168.1.102'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
-channel = '#tf2.pug.na'
-nick = 'PUG-BOT'
+channel = '#tf2.pug'
+nick = 'TF2-BOT'
 name = 'BOT'
 
 adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!force", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
 allowFriends = 1
 awayList = {}
 awayTimer = 0.0
-botID = 0
+botID = 1
 captainStage = 0
 captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
@@ -1298,7 +1333,7 @@ lastGame = 0
 lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_granary"]
+mapList = ["cp_badlands", "cp_granary", "cp_freight"]
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1318,7 +1353,7 @@ userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captai
 userAuth = []
 userChannel = []
 userInfo = []
-userLimit = 20
+userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
