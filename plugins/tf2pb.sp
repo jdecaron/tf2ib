@@ -19,7 +19,7 @@ new players[32][7];
 new String:port[16];
 new regularTime = 30;
 new restricted[16];
-new String:server[16] = "chicago1"; 
+new String:server[16] = "atlanta1"; 
 new String:serverIP[64];
 new String:socketData[192];
 
@@ -304,6 +304,7 @@ public Event_TeamplayRestartRound(Handle:event, const String:name[], bool:dontBr
         StrCat(record, 64, server);
         StrCat(record, 64, port);
         ServerCommand("tv_stoprecord");
+        ServerCommand("log on");
         ServerCommand(record);
         LogToGame("%s", record);
         PrintToChatAll("%s", record);
