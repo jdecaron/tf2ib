@@ -91,7 +91,7 @@ def addGame(userName, userCommand):
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
-        userLimit = 20
+        userLimit = 16
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
@@ -130,8 +130,10 @@ def assignCaptains(mode = 'captain'):
     global teamA, teamB
     if mode == 'captain':
         captain1 = getAPlayer('captain')
+        userList[captain1['nick']]['status'] = 'captain'
         assignUserToTeam(captain1['class'][0], 0, 'a', userList[captain1['nick']])
         captain2 = getAPlayer('captain')
+        userList[captain2['nick']]['status'] = 'captain'
         assignUserToTeam(captain2['class'][0], 0, 'b', userList[captain2['nick']])
         send("PRIVMSG " + channel + ' :\x030,01Captains are \x0311,01' + teamA[0]['nick'] + '\x030,01 and \x034,01' + teamB[0]['nick'] + "\x030,01.")
     elif mode == 'scrim':
@@ -216,6 +218,17 @@ def clearCaptainsFromTeam(team):
         if user['status'] == 'captain':
             user['status'] = ''
 
+def clearSubstitutes(ip, port):
+    global subList
+    i = 0
+    print subList
+    while i < len(subList):
+        if subList[i]['server'] == ip + ':' + port or subList[i]['server'] == getDNSFromIP(ip) + ':' + port:
+            del subList[i]
+        i = i + 1
+        if i > 20:
+            break
+
 def connect():
     global connectTimer, network, nick, name, port, server
     server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
@@ -231,7 +244,19 @@ def createUser(userName, userCommand):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        user['status'] = 'captain'
+        stats = getWinStats(userName)
+        authorized = 1
+        if stats:
+            gamesPlayed = stats[1]
+            handicap = stats[2]
+            if gamesPlayed < 20 or (gamesPlayed > 0 and handicap < 0 and (float(float(handicap) + (gamesPlayed / 2)) / float(gamesPlayed)) <= 0.45):
+                authorized = 0
+        else:
+            authorized = 0
+        if not authorized:
+            send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played and a 45% win ratio.")
+        else:
+            user['status'] = 'captain'
     user['nick'] = userName
     if state == 'captain' or state == 'picking':
         if len(user['class']) > 0:
@@ -575,7 +600,7 @@ def getUserCount():
 
 def getWinStats(userName):
     cursor = connection.cursor()
-    cursor.execute('SELECT nick, count(*), sum(result) FROM stats WHERE nick ILIKE %s GROUP BY nick', (userName,))
+    cursor.execute('SELECT nick, count(*), sum(result) FROM stats WHERE nick = %s AND botID = %s GROUP BY nick', (userName, botID))
     for row in cursor.fetchall():
         return row
     return 0
@@ -768,6 +793,7 @@ def listeningTF2Servers():
                         needsub('', queryData[i][0])
                     if re.search('^!gameover', srcdsData[0]):
                         score = srcdsData[1]
+                        clearSubstitutes(ip, port)
                         updateLast(ip, port, 0)
                         updateStats(ip, port, score)
                         send("PRIVMSG " + channel + " :\x030,01Game over on server \"" + getDNSFromIP(ip) + ":" + port + "\", final score is : \x0311,01" + score.split(':')[0] + "\x030,01 to \x034,01" + score.split(':')[1] + "\x030,01.")
@@ -900,30 +926,31 @@ def printCaptainChoices(printType = 'private'):
     global classList, captainStage, captainStageList, userList
     if printType == 'private':
         captainName = getCaptainNameFromTeam(captainStageList[captainStage])
+        color = '\x0312'
+        followingColor = '\x035'
         dataPrefix = "NOTICE " + captainName + " : "
         send(dataPrefix + captainName + ", you are captain of a team and it's your turn to pick a player. Type \"!pick nick class\" to add somebody in your team.") 
         send(dataPrefix + "Remaining classes : " +  ', '.join(getRemainingClasses())) 
     else:
+        color = '\x038,01'
+        followingColor = '\x030,01'
         dataPrefix = "PRIVMSG " + channel + " :\x030,01"
     for gameClass in classList:
         choiceList = []
         for userName in userList.copy():
             if gameClass in userList[userName]['class']:
-                captain = ''
                 late = ''
-                if re.search('captain', userList[userName]['command']):
-                    captain = 'C'
                 if userList[userName]['late'] == 1:
                     late = 'L'
-                choiceList.append("(" + str(getPlayerNumber(userName)) + captain + late + ")" + userName)
+                choiceList.append("(" + str(getPlayerNumber(userName)) + late + ")" + userName)
         if len(choiceList):
             send(dataPrefix + gameClass.capitalize() + "s: " + ', '.join(choiceList)) 
     choiceList = []
     for userName in userList.copy():
-        late = ''
-        if userList[userName]['late'] == 1:
-            late = 'L'
-        choiceList.append("(" + str(getPlayerNumber(userName)) + captain + late + ")" + userName)
+        captain = ''
+        if userList[userName]['status'] == 'captain':
+            captain = color + 'C' + followingColor
+        choiceList.append("(" + str(getPlayerNumber(userName)) + captain + ")" + userName)
     send(dataPrefix +  str(len(choiceList))+ " user(s) : " + ', '.join(choiceList)) 
 
 def printSubs():
@@ -959,6 +986,8 @@ def printTeams():
     printTeamsHandicaps()
 
 def printTeamsHandicaps():
+    if len(pastGames[len(pastGames) - 1]) <= 6:
+        return 0
     gamesPlayedCounter = [0, 0]
     handicapTotal = [0, 0]
     for user in pastGames[len(pastGames) - 1]['players']:
@@ -989,7 +1018,10 @@ def printUserList():
     if (time.time() - lastUserPrint) > 5:
         message = "\x030,01" + str(len(userList)) + " user(s) subscribed :"
         for i, user in userList.copy().iteritems():
-            message += ' "' + user['nick'] + '"'
+            captain = ''
+            if user['status'] == 'captain':
+                captain = '(\x038,01' + 'C' + '\x030,01)'
+            message += ' "' + captain + user['nick'] + '"'
         send("PRIVMSG " + channel + " :" + message + ".")
     else:
         printTimer.cancel()
@@ -1311,15 +1343,15 @@ def whoisuser(connection, event):
 # Connection information
 network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
-channel = '#tf2.pug'
-nick = 'TF2-BOT'
+channel = '#tf2.pug.na'
+nick = 'PUG-BOT'
 name = 'BOT'
 
 adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!force", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
 allowFriends = 1
 awayList = {}
 awayTimer = 0.0
-botID = 1
+botID = 0
 captainStage = 0
 captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
 classList = ['demo', 'medic', 'scout', 'soldier']
@@ -1330,7 +1362,7 @@ gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "
 initTime = int(time.time())
 initTimer = threading.Timer(0, None)
 lastGame = 0
-lastGameType = "normal"
+lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
 mapList = ["cp_badlands", "cp_granary", "cp_freight"]
@@ -1353,7 +1385,7 @@ userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captai
 userAuth = []
 userChannel = []
 userInfo = []
-userLimit = 12
+userLimit = 16
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
