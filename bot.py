@@ -13,7 +13,7 @@ import time
 
 #irclib.DEBUG = 1
 
-def add(userName, userCommand):
+def add(userName, userCommand, ninjAdd = 0):
     global state, userList
     print "State : " + state
     if state != 'idle':
@@ -24,6 +24,9 @@ def add(userName, userCommand):
                     return 0
                 if len(userCommand.split()) > 2:
                     send("NOTICE " + userName + " : You can't add as multiple classes in this game mode.")
+                    return 0
+                if ninjAdd and userCommand.split()[1] in classList and not getNinjaddSpot(userCommand.split()[1]):
+                    send("NOTICE " + userName + " : There was no ninjadd spot available for this class, try an other one.")
                     return 0
                 availableClasses = getAvailableClasses()
                 if userCommand.split()[1] not in availableClasses:
@@ -326,6 +329,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!needsub', escapedUserCommand):
         needsub(userName, userCommand)
         return 0
+    if re.search('^\\\\!ninjadd', escapedUserCommand):
+        ninjadd(userName, userCommand)
+        return 0
     if re.search('^\\\\!notice', escapedUserCommand):
         notice(userName)
         return 0
@@ -420,12 +426,11 @@ def getAPlayer(playerType):
         userListCopy = userList.copy()
         for user in userListCopy:
             if re.search('medic', userListCopy[user]['command']):
-                if re.search('captain', userListCopy[user]['command']):
+                if userListCopy[user]['status'] == 'captain':
                     medicsCaptains.append(userListCopy[user])
                 else:
-                    userListCopy[user]['status'] = 'captain'
                     medics.append(userListCopy[user])
-            elif re.search('captain', userListCopy[user]['command']):
+            elif userListCopy[user]['status'] == 'captain':
                 otherCaptains.append(userListCopy[user])
         if len(medicsCaptains) > 0:
             player = getRandomItemFromList(medicsCaptains)
@@ -485,9 +490,25 @@ def getIPFromDNS(dns):
             return server['ip']
     return dns
 
+def getLastTimeMedic(userName):
+    cursor = connection.cursor()
+    cursor.execute('SELECT time FROM stats WHERE nick = %s AND class = \'medic\' ORDER BY time DESC LIMIT 1;', (userName,))
+    for row in cursor.fetchall():
+        return row[0]
+    return 0
+
 def getMap():
     global mapList
     return mapList[random.randint(0, (len(mapList) - 1))]
+
+def getMedicStats(userName):
+    medicStats = {'totalGamesAsMedic':0, 'medicWinRatio':0}
+    cursor = connection.cursor()
+    cursor.execute('SELECT nick, count(*), sum(result) FROM stats where nick = %s AND class = \'medic\' AND botID = %s GROUP BY nick', (userName, botID))
+    for row in cursor.fetchall():
+        medicStats['totalGamesAsMedic'] = row[1]
+        medicStats['medicWinRatio'] = float(float(row[2]) + (medicStats['totalGamesAsMedic'] / 2)) / float(medicStats['totalGamesAsMedic'])
+    return medicStats
 
 def getNextPlayerID():
     global userList
@@ -504,6 +525,35 @@ def getNextSubID():
         if sub['id'] > highestID:
             highestID = sub['id']
     return highestID + 1
+
+def getNinjaddSpot(userClass):
+    if userClass in getAvailableClasses():
+        return 1
+    potentialNinjaddSpot = []
+    for user in userList.copy():
+        if userClass in userList[user]['class']:
+            potentialNinjaddSpot.append({'nick':user, 'ratio':0})
+    print potentialNinjaddSpot
+    lowestRatio = 1
+    for i in reversed(range(len(potentialNinjaddSpot))):
+        print i
+        if getLastTimeMedic(potentialNinjaddSpot[i]['nick']) > time.time() - (60 * 60 * 24):
+            del potentialNinjaddSpot[i]
+            continue
+        userStats = getWinStats(potentialNinjaddSpot[i]['nick'])
+        if userStats:
+            ratio = float(getMedicStats(potentialNinjaddSpot[i]['nick'])['totalGamesAsMedic']) / float(userStats[1])
+            potentialNinjaddSpot[i]['ratio'] = ratio
+        print ratio
+        if ratio < lowestRatio:
+            lowestRatio = ratio
+    for i in range(len(potentialNinjaddSpot)):
+        if potentialNinjaddSpot[i]['ratio'] < 0.10 and potentialNinjaddSpot[i]['ratio'] == lowestRatio:
+            send("PRIVMSG " + potentialNinjaddSpot[i]['nick'] + ' :You got removed from the PUG because somebody ninjadded and stole your spot. To protect yourself from a future similar situation you can increase your medic ratio at 10% or have played medic in the last 24 hours.')
+            remove(potentialNinjaddSpot[i]['nick'])
+            return 1
+    print potentialNinjaddSpot
+    return 0
 
 def getNumberOfFriendsPerClass(gameClass):
     if gameClass == 'medic':
@@ -761,7 +811,7 @@ def limit(userName, userCommand):
     if len(commandList) < 2:
         send("PRIVMSG " + channel + " :\x030,01The PUG's user limit is set to \"" + str(userLimit) + "\".")
         return 0
-    try:
+    """try:
         if not isAdmin(userName):
             send("PRIVMSG " + channel + " :\x030,01Warning " + userName + ", you are trying an admin command as a normal user.")
             return 0
@@ -770,7 +820,7 @@ def limit(userName, userCommand):
             return 0
     except:
         return 0
-    userLimit = int(commandList[1])
+    userLimit = int(commandList[1])"""
 
 def listeningTF2Servers():
     global connection, pastGames
@@ -844,6 +894,23 @@ def nickchange(connection, event):
         userList[newUserName]['nick'] = newUserName
         del userList[oldUserName]
 
+def ninjadd(userName, userCommand):
+    """if time.time() - getLastTimeMedic(userName) >= (60 * 60 * 24):
+        send("NOTICE " + userName + " : Error, you need to have played medic at least once in the last 24 hours to be able to \"!ninjadd\".") 
+        #return 0"""
+    medicStats = getMedicStats(userName)
+    if medicStats['medicWinRatio'] < 0.40:
+        send("NOTICE " + userName + " : Error, you need to have a win ratio above 40% as medic to be able to \"!ninjadd\".") 
+        return 0
+    winStats = getWinStats(userName)
+    if not winStats or winStats[1] < 20:
+        send("NOTICE " + userName + " : Error, you need to have played more than 20 games to be able to \"!ninjadd\".")
+        return 0
+    if not winStats or float(medicStats['totalGamesAsMedic']) / float(winStats[1]) < 0.16:
+        send("NOTICE " + userName + " : Error, you need to have a medic ratio above 16% to be able to \"!ninjadd\".")
+        return 0
+    add(userName, userCommand, 1)
+
 def notice(userName):
     send("NOTICE " + userName + " : Notice!!!!")
 
@@ -861,6 +928,7 @@ def pick(userName, userCommand):
     commandsToDelete = []
     counter = 0
     gameClass = ''
+    medicsRemaining = 0
     for command in commandList:
         if command in classList:
             gameClass = command
@@ -881,16 +949,19 @@ def pick(userName, userCommand):
             if userList[user]['nick'] == commandList[0]:
                 userFound = 1
                 break
-    team = getTeam(captainStageList[captainStage])
-    teamHasMedic = 0
+    team = getTeam(getOppositeTeam(captainStageList[captainStage]))
+    oppositeTeamHasMedic = 0
     for i in range(len(team)):
         if 'medic' in team[i]['class']:
-            teamHasMedic = 1
+            oppositeTeamHasMedic = 1
+    for user in userList.copy():
+        if 'medic' in userList[user]['class']:
+            medicsRemaining = medicsRemaining + 1
     if not assignToCaptain and counter == 3:
         send("NOTICE " + userName + " : Error, your command has 3 parameters but doesn't contain the word \"captain\". Did you try to set your pick as a captain?")
         return 0
-    if not teamHasMedic and gameClass != 'medic':
-        send("NOTICE " + userName + " : Error, you must pick a medic first.")
+    if lastGameType != 'scrim' and not oppositeTeamHasMedic and medicsRemaining == 1 and 'medic' in userList[commandList[0]]['class']:
+        send("NOTICE " + userName + " : Error, you can't pick the last medic if you already have one.")
         return 0
     if not userFound:
         send("NOTICE " + userName + " : Error, this user doesn\'t exists.")
@@ -986,7 +1057,7 @@ def printTeams():
     printTeamsHandicaps()
 
 def printTeamsHandicaps():
-    if len(pastGames[len(pastGames) - 1]) <= 6:
+    if len(pastGames[len(pastGames) - 1]['players']) <= 6:
         return 0
     gamesPlayedCounter = [0, 0]
     handicapTotal = [0, 0]
@@ -1010,8 +1081,8 @@ def printTeamsHandicaps():
         victoriesTotal[teamIndex] = (gamesPlayedCounter[teamIndex]/2) + handicapTotal[teamIndex]
         winRatioOverall[teamIndex] = 100 * float(float(victoriesTotal[teamIndex])/float(gamesPlayedCounter[teamIndex]))
     print winRatioOverall
-    if abs(winRatioOverall[0] - winRatioOverall[1]) >= 15:
-        send("PRIVMSG " + channel + " :\x038,01According to the Saucier2000 algorythm the teams aren't fair, \"!scramble\" them.")
+    if lastGameType != 'captain' and abs(winRatioOverall[0] - winRatioOverall[1]) >= 15:
+        send("PRIVMSG " + channel + " :\x038,01According to the Saucier2000 algorithm the teams aren't fair, \"!scramble\" them.")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -1365,7 +1436,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_granary", "cp_freight"]
+mapList = ["cp_badlands", "cp_granary", "cp_yukon_final"]
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1381,7 +1452,7 @@ scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
 tf2pbPassword = ''
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userAuth = []
 userChannel = []
 userInfo = []
