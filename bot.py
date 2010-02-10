@@ -252,7 +252,7 @@ def createUser(userName, userCommand):
         if stats:
             gamesPlayed = stats[1]
             handicap = stats[2]
-            if gamesPlayed < 20 or (gamesPlayed > 0 and handicap < 0 and (float(float(handicap) + (gamesPlayed / 2)) / float(gamesPlayed)) <= 0.45):
+            if gamesPlayed < 20 or (gamesPlayed > 0 and float(handicap + gamesPlayed) / float(2 * gamesPlayed) <= 0.45):
                 authorized = 0
         else:
             authorized = 0
@@ -492,7 +492,7 @@ def getIPFromDNS(dns):
 
 def getLastTimeMedic(userName):
     cursor = connection.cursor()
-    cursor.execute('SELECT time FROM stats WHERE nick = %s AND class = \'medic\' ORDER BY time DESC LIMIT 1;', (userName,))
+    cursor.execute('SELECT time FROM stats WHERE nick ILIKE %s AND class = \'medic\' ORDER BY time DESC LIMIT 1;', (userName,))
     for row in cursor.fetchall():
         return row[0]
     return 0
@@ -504,7 +504,7 @@ def getMap():
 def getMedicStats(userName):
     medicStats = {'totalGamesAsMedic':0, 'medicWinRatio':0}
     cursor = connection.cursor()
-    cursor.execute('SELECT nick, count(*), sum(result) FROM stats where nick = %s AND class = \'medic\' AND botID = %s GROUP BY nick', (userName, botID))
+    cursor.execute('SELECT lower(nick), count(*), sum(result) FROM stats where nick ILIKE %s AND class = \'medic\' AND botID = %s GROUP BY lower(nick)', (userName, botID))
     for row in cursor.fetchall():
         medicStats['totalGamesAsMedic'] = row[1]
         medicStats['medicWinRatio'] = float(float(row[2]) + (medicStats['totalGamesAsMedic'] / 2)) / float(medicStats['totalGamesAsMedic'])
@@ -650,7 +650,7 @@ def getUserCount():
 
 def getWinStats(userName):
     cursor = connection.cursor()
-    cursor.execute('SELECT nick, count(*), sum(result) FROM stats WHERE nick = %s AND botID = %s GROUP BY nick', (userName, botID))
+    cursor.execute('SELECT lower(nick), count(*), sum(result) FROM stats WHERE nick ILIKE %s AND botID = %s GROUP BY lower(nick)', (userName, botID))
     for row in cursor.fetchall():
         return row
     return 0
@@ -1075,14 +1075,10 @@ def printTeamsHandicaps():
                 teamIndex = 1
             gamesPlayedCounter[teamIndex] = gamesPlayedCounter[teamIndex] + gamesPlayed
             handicapTotal[teamIndex] = handicapTotal[teamIndex] + handicap
-    victoriesTotal = [0, 0]
     winRatioOverall = [0, 0]
     for teamIndex in range(2):
-        victoriesTotal[teamIndex] = (gamesPlayedCounter[teamIndex]/2) + handicapTotal[teamIndex]
-        winRatioOverall[teamIndex] = 100 * float(float(victoriesTotal[teamIndex])/float(gamesPlayedCounter[teamIndex]))
-    print winRatioOverall
-    if lastGameType != 'captain' and abs(winRatioOverall[0] - winRatioOverall[1]) >= 15:
-        send("PRIVMSG " + channel + " :\x038,01According to the Saucier2000 algorithm the teams aren't fair, \"!scramble\" them.")
+        winRatioOverall[teamIndex] = 100 * (float(handicapTotal[teamIndex] + gamesPlayedCounter[teamIndex]) / float(2 * gamesPlayedCounter[teamIndex]))
+    send("PRIVMSG " + channel + " :\x030,01Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
