@@ -390,7 +390,7 @@ def findAwayUsers():
     global awayList, userList
     if type(awayTimer).__name__ == 'float' and time.time() - awayTimer <= (5 * 60):
         awayList = {}
-    else:
+    elif len(awayList) == 0:
         for user in userList:
             if user in userList and userList[user]['last'] <= (time.time() - (7 * 60)):
                 awayList[user] = userList[user]
