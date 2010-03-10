@@ -62,10 +62,14 @@ def add(userName, userCommand, ninjAdd = 0):
                 elif type(awayTimer).__name__ == 'float':
                     sendMessageToAwayPlayers()
         elif state == 'picking' and not isUserCountOverLimit():
-            if isInATeam(userName):
+            if initTimer.isAlive():
+                if isInATeam(userName):
+                    return 0
+                userList[userName] = createUser(userName, userCommand)
+                printUserList()
+            else:
+                send("NOTICE " + userName + " : You can't add during the picking process.")
                 return 0
-            userList[userName] = createUser(userName, userCommand)
-            printUserList()
     else:
         send("PRIVMSG " + channel + " :\x030,01You can't \"!add\" until an admin has started a game.")
 
@@ -94,7 +98,7 @@ def addGame(userName, userCommand):
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
-        userLimit = 16
+        userLimit = 15
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
@@ -234,7 +238,7 @@ def clearSubstitutes(ip, port):
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
+    server.connect(network, port, nick, ircname = name)
 
 def createUser(userName, userCommand):
     global classList, state
@@ -252,7 +256,7 @@ def createUser(userName, userCommand):
         if stats:
             gamesPlayed = stats[1]
             handicap = stats[2]
-            if gamesPlayed < 20 or (gamesPlayed > 0 and float(handicap + gamesPlayed) / float(2 * gamesPlayed) <= 0.45):
+            if 'medic' not in user['class'] and (gamesPlayed < 20 or (gamesPlayed > 0 and float(handicap + gamesPlayed) / float(2 * gamesPlayed) <= 0.45)):
                 authorized = 0
         else:
             authorized = 0
@@ -533,18 +537,16 @@ def getNinjaddSpot(userClass):
     for user in userList.copy():
         if userClass in userList[user]['class']:
             potentialNinjaddSpot.append({'nick':user, 'ratio':0})
-    print potentialNinjaddSpot
     lowestRatio = 1
     for i in reversed(range(len(potentialNinjaddSpot))):
-        print i
         if getLastTimeMedic(potentialNinjaddSpot[i]['nick']) > time.time() - (60 * 60 * 24):
             del potentialNinjaddSpot[i]
             continue
         userStats = getWinStats(potentialNinjaddSpot[i]['nick'])
+        ratio = 0
         if userStats:
             ratio = float(getMedicStats(potentialNinjaddSpot[i]['nick'])['totalGamesAsMedic']) / float(userStats[1])
             potentialNinjaddSpot[i]['ratio'] = ratio
-        print ratio
         if ratio < lowestRatio:
             lowestRatio = ratio
     for i in range(len(potentialNinjaddSpot)):
@@ -552,7 +554,6 @@ def getNinjaddSpot(userClass):
             send("PRIVMSG " + potentialNinjaddSpot[i]['nick'] + ' :You got removed from the PUG because somebody ninjadded and stole your spot. To protect yourself from a future similar situation you can increase your medic ratio at 10% or have played medic in the last 24 hours.')
             remove(potentialNinjaddSpot[i]['nick'])
             return 1
-    print potentialNinjaddSpot
     return 0
 
 def getNumberOfFriendsPerClass(gameClass):
@@ -761,13 +762,13 @@ def initGame():
     elif state == "captain":
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
-        initTimer = threading.Timer(20, assignCaptains, ['captain'])
+        initTimer = threading.Timer(60, assignCaptains, ['captain'])
         initTimer.start()
         players(nick)
     elif state == "scrim":
         send("PRIVMSG " + channel + " :\x038,01Team is being drafted, please wait in the channel until this process is over.")
         state = 'picking'
-        initTimer = threading.Timer(20, assignCaptains, ['scrim'])
+        initTimer = threading.Timer(60, assignCaptains, ['scrim'])
         initTimer.start()
         players(nick)
 
@@ -811,7 +812,7 @@ def limit(userName, userCommand):
     if len(commandList) < 2:
         send("PRIVMSG " + channel + " :\x030,01The PUG's user limit is set to \"" + str(userLimit) + "\".")
         return 0
-    """try:
+    try:
         if not isAdmin(userName):
             send("PRIVMSG " + channel + " :\x030,01Warning " + userName + ", you are trying an admin command as a normal user.")
             return 0
@@ -820,7 +821,7 @@ def limit(userName, userCommand):
             return 0
     except:
         return 0
-    userLimit = int(commandList[1])"""
+    userLimit = int(commandList[1])
 
 def listeningTF2Servers():
     global connection, pastGames
@@ -855,7 +856,7 @@ def listeningTF2Servers():
 
 def mumble():
     global voiceServer
-    message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://downloads.sourceforge.net/project/mumble/Mumble/1.2.1/Mumble-1.2.1.exe"
+    message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://downloads.sourceforge.net/project/mumble/Mumble/1.2.2/Mumble-1.2.2.exe"
     send("PRIVMSG " + channel + " :" + message)
 
 def needsub(userName, userCommand):
@@ -1097,7 +1098,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    printTeamsHandicaps()
+    print initTimer.isAlive()
 
 def readPasswords():
     global rconPassword, tf2pbPassword
@@ -1246,7 +1247,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"" + color[teamCounter] + "connect " + gameServer + "; password " + password + ";\x031\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug\".")
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
             userCounter += 1
         teamCounter += 1
 
@@ -1408,7 +1409,7 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = 'Gameservers.NJ.US.GameSurge.net'
+network = '192.168.1.102'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -1432,7 +1433,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_granary", "cp_yukon_final"]
+mapList = ["cp_badlands", "cp_granary", "cp_freight"]
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1452,7 +1453,7 @@ userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captai
 userAuth = []
 userChannel = []
 userInfo = []
-userLimit = 16
+userLimit = 15
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 whoisEnded = 0
