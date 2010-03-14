@@ -238,7 +238,7 @@ def clearSubstitutes(ip, port):
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name)
+    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
 
 def createUser(userName, userCommand):
     global classList, state
@@ -1078,8 +1078,11 @@ def printTeamsHandicaps():
             handicapTotal[teamIndex] = handicapTotal[teamIndex] + handicap
     winRatioOverall = [0, 0]
     for teamIndex in range(2):
-        winRatioOverall[teamIndex] = 100 * (float(handicapTotal[teamIndex] + gamesPlayedCounter[teamIndex]) / float(2 * gamesPlayedCounter[teamIndex]))
-    send("PRIVMSG " + channel + " :\x030,01Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%")
+        if gamesPlayedCounter[teamIndex] == 0:
+            winRatioOverall[teamIndex] = 0
+        else:
+            winRatioOverall[teamIndex] = 100 * (float(handicapTotal[teamIndex] + gamesPlayedCounter[teamIndex]) / float(2 * gamesPlayedCounter[teamIndex]))
+    print "Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%"
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -1267,10 +1270,52 @@ def startGame():
 
 def stats(userName, userCommand):
     commandList = string.split(userCommand, ' ')
-    if len(commandList) < 2:
-        send("NOTICE " + userName + " : Error, there is not enough arguments in your \"!stats\" command. Example : \"!stats nick\".")
-        return 0
     cursor = connection.cursor()
+    if len(commandList) < 2:
+        if len(userList) == 0:
+            send("PRIVMSG " + channel + ' :\x030,01There is no players added up at the moment.')
+            return 0
+        maximum = 0
+        sorted = []
+        stats = {}
+        for player in userList.copy():
+            print player
+            cursor.execute('select lower(nick), count(*) from stats where nick ILIKE %s group by lower(nick);', (player,))
+            result = cursor.fetchall()
+            stats[player] = []
+            if len(result) > 0:
+                stats[player].append(result[0][1])
+            else:
+                stats[player].append(0)
+            cursor.execute('select lower(nick), count(*) from stats where nick ILIKE %s and class = \'medic\' group by lower(nick);', (player,))
+            result = cursor.fetchall()
+            if len(result) > 0:
+                stats[player].append(result[0][1])
+            else:
+                stats[player].append(0)
+            if stats[player][1] > 0:
+                stats[player][1] = int(float(stats[player][1]) / float(stats[player][0]) * float(100))
+                if stats[player][1] > maximum:
+                    maximum = stats[player][1]
+            if stats[player][1] == maximum:
+                sorted.insert(0, player)
+            else:
+                if len(sorted) > 0:
+                    j = 0
+                    sorted.reverse()
+                    for i in sorted:
+                        if stats[player][1] <= stats[i][1]:
+                            sorted.insert(j, player)
+                            break
+                        j = j + 1
+                    sorted.reverse()
+        j = 0
+        sorted.reverse()
+        for i in sorted:
+            sorted[j] = i + ' = ' + str(stats[i][1]) + '%'
+            j = j + 1
+        send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted) + '.')
+        return 0
     cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s', (commandList[1], botID))
     counter = 0
     medicCounter = 0
@@ -1295,7 +1340,8 @@ def stats(userName, userCommand):
         color = "\x038,01"
     else:
         color = "\x034,01"
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
+    print commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.'
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s) and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
@@ -1409,7 +1455,7 @@ def whoisuser(connection, event):
         userInfo.append(i)
 
 # Connection information
-network = '192.168.1.102'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
