@@ -505,6 +505,14 @@ def getMap():
     global mapList
     return mapList[random.randint(0, (len(mapList) - 1))]
 
+def getMedicRatioColor(medicRatio):
+    if medicRatio >= 7:
+        return "\x039,01"
+    elif medicRatio >= 5:
+        return "\x038,01"
+    else:
+        return "\x034,01"
+
 def getMedicStats(userName):
     medicStats = {'totalGamesAsMedic':0, 'medicWinRatio':0}
     cursor = connection.cursor()
@@ -1312,7 +1320,7 @@ def stats(userName, userCommand):
         j = 0
         sorted.reverse()
         for i in sorted:
-            sorted[j] = i + ' = ' + str(stats[i][1]) + '%'
+            sorted[j] = i + ' = ' + getMedicRatioColor(stats[i][1]) + str(stats[i][1]) + '%\x030,01'
             j = j + 1
         send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted) + '.')
         return 0
@@ -1334,12 +1342,7 @@ def stats(userName, userCommand):
         return 0
     medicRatio = int(float(medicCounter) / float(counter) * 100)
     winRatio = int(float(winCounter) / float(counter) * 100)
-    if medicRatio >= 10:
-        color = "\x039,01"
-    elif medicRatio >= 5:
-        color = "\x038,01"
-    else:
-        color = "\x034,01"
+    color = getMedicRatioColor(medicRatio)
     print commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.'
     send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s) and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
 
