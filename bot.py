@@ -1258,7 +1258,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\".")
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker : \x0301tf://" + gameServer + "/" + password)
             userCounter += 1
         teamCounter += 1
 
@@ -1320,7 +1320,7 @@ def stats(userName, userCommand):
         j = 0
         sorted.reverse()
         for i in sorted:
-            sorted[j] = i + ' = ' + getMedicRatioColor(stats[i][1]) + str(stats[i][1]) + '%\x030,01'
+            sorted[j] = i + ' = ' + getMedicRatioColor(stats[i][1]) + str(stats[i][0]) + '/' + str(stats[i][1]) + '%\x030,01'
             j = j + 1
         send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted) + '.')
         return 0
