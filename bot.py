@@ -1258,7 +1258,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker : \x0301tf://" + gameServer + "/" + password)
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker \x0301: tf://" + gameServer + "/" + password)
             userCounter += 1
         teamCounter += 1
 
