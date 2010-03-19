@@ -86,11 +86,7 @@ def addFriend(userName, userCommand):
 def addGame(userName, userCommand):
     resetVariables()
     global allowFriends, classList, gameServer, lastGameType, state, userLimit
-    # Game server.
-    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
-        gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
-    else:
-        send("NOTICE " + userName + " : You must set a server IP. Here is an example : \"!add 127.0.0.1:27015\".")
+    if not setIP(userName, userCommand):
         return 0
     # Game type.
     if re.search('captain', userCommand):
@@ -243,7 +239,7 @@ def connect():
 def createUser(userName, userCommand):
     global classList, state
     commandList = string.split(userCommand, ' ')
-    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'last':0, 'late':0, 'nick':'', 'status':'', 'team':''}
+    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'last':0, 'late':0, 'nick':'', 'remove':0, 'status':'', 'team':''}
     user['command'] = userCommand
     user['id'] = getNextPlayerID()
     user['last'] = time.time()
@@ -313,7 +309,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         game(userName, userCommand)
         return 0
     if re.search('^\\\\!ip', escapedUserCommand):
-        ip()
+        ip(userName, userCommand)
         return 0
     if re.search('^\\\\!last', escapedUserCommand):
         last()
@@ -667,11 +663,15 @@ def getWinStats(userName):
 def help():
     send("PRIVMSG " + channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
 
-def ip():
+def ip(userName, userCommand):
     global gameServer
-    if gameServer != '':
-        message = "\x030,01Server IP : connect " + gameServer + "; password " + password + ";"
-        send("PRIVMSG " + channel + " :" + message)
+    commandList = string.split(userCommand, ' ')
+    if len(commandList) < 2:
+        if gameServer != '':
+            message = "\x030,01Server IP : \"connect " + gameServer + "; password " + password + ";\". Servers are provided by AI : \x0307,01http://aigaming.com/"
+            send("PRIVMSG " + channel + " :" + message)
+        return 0
+    setIP(userName, userCommand)
 
 def isAdmin(userName):
     whoisData = whois(userName)
@@ -826,6 +826,10 @@ def limit(userName, userCommand):
             return 0
         if int(commandList[1]) < 12:
             send("NOTICE " + userName + " : The limit value must be equal or above 12.")
+            return 0
+        if int(commandList[1]) > 18:
+            send("NOTICE " + userName + " : The maximum limit is at 18. And please, don't restart the bot or the PUG.")
+            userLimit = 18
             return 0
     except:
         return 0
@@ -1109,7 +1113,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    print initTimer.isAlive()
+    print 'prototype'
 
 def readPasswords():
     global rconPassword, tf2pbPassword
@@ -1159,7 +1163,10 @@ def replace(userName, userCommand):
 
 def remove(userName):
     global initTimer, state, userList
-    if(isUser(userName)) and (state != 'picking' and state != 'building'):
+    if(isUser(userName)) and (state == 'picking' or state == 'building'):
+        send("NOTICE " + userName + " : Warning, you removed but the teams are getting drafted at the moment and there are still some chances that you will get in this PUG. Make sure you clearly announce to the users in the channel and to the captains that you may need a substitute.")
+        userList[userName]['remove'] = 1
+    elif isUser(userName):
         del userList[userName]
         initTimer.cancel()
         printUserList()
@@ -1171,6 +1178,11 @@ def removeAwayUsers():
     awayList = {}
     awayTimer = time.time()
     updateUserStatus('', '')
+
+def removeUnremovedUsers():
+    for user in userList.copy():
+        if userList[user]['remove'] == 1:
+            remove(user)
 
 def removeLastEscapeCharacter(userCommand):
     if userCommand[len(userCommand) - 1] == '\\':
@@ -1189,9 +1201,9 @@ def resetVariables():
     captainStage = 0
     captainStageList = ['a', 'b', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'] 
     gameServer = ''
+    removeUnremovedUsers()
     teamA = []
     teamB = []
-    userList = {}
     print 'Reset variables.'
 
 def restartBot():
@@ -1252,15 +1264,25 @@ def sendMessageToAwayPlayers():
 
 def sendStartPrivateMessages():
     color = ['\x0312', '\x034']
-    teamName = ['\x0312blue\x031', '\x034red\x031']
+    teamName = ['\x0312blue\x03', '\x034red\x03']
     teamCounter = 0
     userCounter = 0
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker \x0301: tf://" + gameServer + "/" + password)
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker : \x03tf://" + gameServer + "/" + password)
             userCounter += 1
         teamCounter += 1
+
+def setIP(userName, userCommand):
+    global gameServer
+    # Game server.
+    if re.search("[0-9a-z]*\.[0-9a-z]*:[0-9][0-9][0-9][0-9][0-9]", userCommand):
+        gameServer = re.findall("[0-9a-z]*\..*:[0-9][0-9][0-9][0-9][0-9]", userCommand)[0]
+        return 1
+    else:
+        send("NOTICE " + userName + " : You must set a server IP. Here is an example : \"!add 127.0.0.1:27015\".")
+        return 0
 
 def setStartMode(mode):
     global startMode
@@ -1322,7 +1344,7 @@ def stats(userName, userCommand):
         for i in sorted:
             sorted[j] = i + ' = ' + getMedicRatioColor(stats[i][1]) + str(stats[i][0]) + '/' + str(stats[i][1]) + '%\x030,01'
             j = j + 1
-        send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted) + '.')
+        send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted))
         return 0
     cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s', (commandList[1], botID))
     counter = 0
