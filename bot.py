@@ -17,6 +17,11 @@ def add(userName, userCommand, ninjAdd = 0):
     global state, userList
     print "State : " + state
     if state != 'idle':
+        medicStats = getMedicStats(userName)
+        winStats = getWinStats(userName)
+        if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[1]) < 0.05)):
+            send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
+            return 0
         if state == 'captain' or state == 'highlander' or state == 'normal':
             if state == 'highlander' or state == 'normal':
                 if len(userCommand.split()) <= 1:
@@ -45,6 +50,9 @@ def add(userName, userCommand, ninjAdd = 0):
                 userList[userName] = createUser(userName, userCommand)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
+                if countCaptains() < 2:
+                    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
+                    return 0
                 if len(findAwayUsers()) == 0:
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
@@ -232,6 +240,14 @@ def clearSubstitutes(ip, port):
         if i > 20:
             break
 
+def countCaptains():
+    userListCopy = userList.copy()
+    counter = 0
+    for user in userListCopy:
+        if userListCopy[user]['status'] == 'captain':
+            counter = counter + 1
+    return counter
+
 def connect():
     global connectTimer, network, nick, name, port, server
     server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
@@ -247,16 +263,7 @@ def createUser(userName, userCommand):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        stats = getWinStats(userName)
-        authorized = 1
-        if stats:
-            gamesPlayed = stats[1]
-            handicap = stats[2]
-            if 'medic' not in user['class'] and (gamesPlayed < 20 or (gamesPlayed > 0 and float(handicap + gamesPlayed) / float(2 * gamesPlayed) <= 0.45)):
-                authorized = 0
-        else:
-            authorized = 0
-        if not authorized:
+        if 'medic' not in user['class'] and getWinStats(userName)[1] < 20:
             send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played and a 45% win ratio.")
         else:
             user['status'] = 'captain'
@@ -436,7 +443,17 @@ def getAPlayer(playerType):
             player = getRandomItemFromList(medicsCaptains)
             player['class'] = ['medic']
         elif len(otherCaptains) > 0:
-            player = getRandomItemFromList(otherCaptains)
+            maximum = 0
+            otherCaptainWithMaximumRatio = ''
+            for otherCaptain in otherCaptains:
+                winStats = getWinStats(otherCaptain['nick'])
+                if winStats[3] > maximum:
+                    maximum = winStats[3]
+                    otherCaptainWithMaximumRatio = otherCaptain['nick']
+            if maximum > 0:
+                player = userListCopy[otherCaptainWithMaximumRatio]
+            else:
+                player = getRandomItemFromList(otherCaptains)
             if len(player['class']) > 0:
                 player['class'] = [player['class'][0]]
             else:
@@ -515,7 +532,7 @@ def getMedicStats(userName):
     cursor.execute('SELECT lower(nick), count(*), sum(result) FROM stats where nick ILIKE %s AND class = \'medic\' AND botID = %s GROUP BY lower(nick)', (userName, botID))
     for row in cursor.fetchall():
         medicStats['totalGamesAsMedic'] = row[1]
-        medicStats['medicWinRatio'] = float(float(row[2]) + (medicStats['totalGamesAsMedic'] / 2)) / float(medicStats['totalGamesAsMedic'])
+        medicStats['medicWinRatio'] = float(float(row[2]) + float(medicStats['totalGamesAsMedic']) / float(medicStats['totalGamesAsMedic'] * 2))
     return medicStats
 
 def getNextPlayerID():
@@ -546,10 +563,10 @@ def getNinjaddSpot(userClass):
         if getLastTimeMedic(potentialNinjaddSpot[i]['nick']) > time.time() - (60 * 60 * 24):
             del potentialNinjaddSpot[i]
             continue
-        userStats = getWinStats(potentialNinjaddSpot[i]['nick'])
+        winStats = getWinStats(potentialNinjaddSpot[i]['nick'])
         ratio = 0
-        if userStats:
-            ratio = float(getMedicStats(potentialNinjaddSpot[i]['nick'])['totalGamesAsMedic']) / float(userStats[1])
+        if winStats:
+            ratio = float(getMedicStats(potentialNinjaddSpot[i]['nick'])['totalGamesAsMedic']) / float(winStats[1])
             potentialNinjaddSpot[i]['ratio'] = ratio
         if ratio < lowestRatio:
             lowestRatio = ratio
@@ -657,8 +674,8 @@ def getWinStats(userName):
     cursor = connection.cursor()
     cursor.execute('SELECT lower(nick), count(*), sum(result) FROM stats WHERE nick ILIKE %s AND botID = %s GROUP BY lower(nick)', (userName, botID))
     for row in cursor.fetchall():
-        return row
-    return 0
+        return [row[0], row[1], row[2], float((float(row[2]) + float(row[1])) / float(row[1] * 2))]
+    return [userName, 0, 0, 0]
 
 def help():
     send("PRIVMSG " + channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
@@ -697,15 +714,6 @@ def isAuthorizedCaptain(userName):
     for user in team:
         if user['status'] == 'captain' and user['nick'] == userName:
             return 1
-    return 0
-
-def isCaptain(userName):
-    teamList = ['a', 'b']
-    for teamName in teamList:
-        team = getTeam(teamName)
-        for user in team:
-            if user['status'] == 'captain' and user['nick'] == userName:
-                return 1
     return 0
 
 def isGamesurgeCommand(userCommand):
@@ -768,6 +776,8 @@ def initGame():
         startGameTimer = threading.Timer(100, startGame)
         startGameTimer.start()
     elif state == "captain":
+        if countCaptains() < 2:
+            return 0
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
         initTimer = threading.Timer(60, assignCaptains, ['captain'])
@@ -1075,10 +1085,10 @@ def printTeamsHandicaps():
     gamesPlayedCounter = [0, 0]
     handicapTotal = [0, 0]
     for user in pastGames[len(pastGames) - 1]['players']:
-        stats = getWinStats(user['nick'])
-        if stats:
-            gamesPlayed = stats[1]
-            handicap = stats[2]
+        winStats = getWinStats(user['nick'])
+        if winStats[1]:
+            gamesPlayed = winStats[1]
+            handicap = winStats[2]
             if gamesPlayed > 20:
                 handicap = (handicap * 20) / gamesPlayed
                 gamesPlayed = 20
@@ -1309,20 +1319,9 @@ def stats(userName, userCommand):
         sorted = []
         stats = {}
         for player in userList.copy():
-            print player
-            cursor.execute('select lower(nick), count(*) from stats where nick ILIKE %s group by lower(nick);', (player,))
-            result = cursor.fetchall()
             stats[player] = []
-            if len(result) > 0:
-                stats[player].append(result[0][1])
-            else:
-                stats[player].append(0)
-            cursor.execute('select lower(nick), count(*) from stats where nick ILIKE %s and class = \'medic\' group by lower(nick);', (player,))
-            result = cursor.fetchall()
-            if len(result) > 0:
-                stats[player].append(result[0][1])
-            else:
-                stats[player].append(0)
+            stats[player].append(getWinStats(player)[1])
+            stats[player].append(getMedicStats(player)['totalGamesAsMedic'])
             if stats[player][1] > 0:
                 stats[player][1] = int(float(stats[player][1]) / float(stats[player][0]) * float(100))
                 if stats[player][1] > maximum:
@@ -1346,27 +1345,16 @@ def stats(userName, userCommand):
             j = j + 1
         send("PRIVMSG " + channel + ' :\x030,01Medic stats : ' + ", ".join(sorted))
         return 0
-    cursor.execute('SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s', (commandList[1], botID))
-    counter = 0
-    medicCounter = 0
-    winCounter = 0
-    for row in cursor.fetchall():
-        last = row[3]
-        if row[2] == 0:
-            winCounter += .5
-        elif row[2] == 1:
-            winCounter += 1
-        if row[0] == 'medic':
-            medicCounter += 1
-        counter += 1
-    if counter == 0:
+    medicStats = getMedicStats(commandList[1])
+    winStats = getWinStats(commandList[1])
+    if not winStats[1]:
         send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
         return 0
-    medicRatio = int(float(medicCounter) / float(counter) * 100)
-    winRatio = int(float(winCounter) / float(counter) * 100)
+    medicRatio = int(float(medicStats['totalGamesAsMedic']) / float(winStats[1]) * 100)
+    winRatio = int(winStats[3] * 100)
     color = getMedicRatioColor(medicRatio)
-    print commandList[1] + ' played a total of ' + str(counter) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.'
-    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(counter) + ' game(s) and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
+    print commandList[1] + ' played a total of ' + str(winStats[1]) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.'
+    send("PRIVMSG " + channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(winStats[1]) + ' game(s) and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.')
 
 def sub(userName, userCommand):
     global subList
