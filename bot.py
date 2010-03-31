@@ -19,9 +19,9 @@ def add(userName, userCommand, ninjAdd = 0):
     if state != 'idle':
         medicStats = getMedicStats(userName)
         winStats = getWinStats(userName)
-        if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[1]) < 0.05)):
+        """if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[1]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-            return 0
+            return 0"""
         if state == 'captain' or state == 'highlander' or state == 'normal':
             if state == 'highlander' or state == 'normal':
                 if len(userCommand.split()) <= 1:
@@ -837,10 +837,10 @@ def limit(userName, userCommand):
         if int(commandList[1]) < 12:
             send("NOTICE " + userName + " : The limit value must be equal or above 12.")
             return 0
-        if int(commandList[1]) > 18:
+        """if int(commandList[1]) > 18:
             send("NOTICE " + userName + " : The maximum limit is at 18. And please, don't restart the bot or the PUG.")
             userLimit = 18
-            return 0
+            return 0"""
     except:
         return 0
     userLimit = int(commandList[1])
@@ -860,10 +860,12 @@ def listeningTF2Servers():
             server = srcdsData[len(srcdsData) - 1]
             ip = string.split(server, ':')[0]
             port = string.split(server, ':')[1]
+            if re.search('^!needsub', srcdsData[0]):
+                needsub('', queryData[i][0])
+                cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
+                cursor.execute('COMMIT;')
             for pastGame in pastGames:
                 if pastGame['server'] == server or pastGame['server'] == getDNSFromIP(ip) + ':' + port:
-                    if re.search('^!needsub', srcdsData[0]):
-                        needsub('', queryData[i][0])
                     if re.search('^!gameover', srcdsData[0]):
                         score = srcdsData[1]
                         clearSubstitutes(ip, port)
