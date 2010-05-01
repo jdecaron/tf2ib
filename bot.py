@@ -118,13 +118,17 @@ def addGame(userName, userCommand):
     updateLast(gameServer.split(':')[0], gameServer.split(':')[1], -(time.time()))
     send("PRIVMSG " + channel + ' :\x030,01PUG started. Game type : ' + state + '. Type "!add" to join a game.')
 
-def analyseCommand(connection, event):
-    global userList
+def analyseIRCText(connection, event):
+    global adminList, userList
     userName = extractUserName(event.source())
     userCommand = event.arguments()[0]
+    escapedChannel = cleanUserCommand(channel).replace('\\.', '\\\\.')
     escapedUserCommand = cleanUserCommand(event.arguments()[0])
+    saveToLogs("[" + time.ctime() + "] <" + userName + "> " + userCommand + "\n")
     if userName in userList:
         updateUserStatus(userName, escapedUserCommand)
+    if re.match('^.*\\\\ \\\\\(.*\\\\\)\\\\ has\\\\ access\\\\ \\\\\x02\d\d\d\\\\\x02\\\\ in\\\\ \\\\' + escapedChannel + '\\\\.$', escapedUserCommand):
+        adminList[userCommand.split()[0]] = int(userCommand.split()[4].replace('\x02', ''))
     if re.match('^\\\\!', escapedUserCommand):
     # Check if the user is trying to pass a command to the bot.
         if isAdminCommand(userName, escapedUserCommand):
@@ -264,7 +268,7 @@ def createUser(userName, userCommand):
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
         if 'medic' not in user['class'] and getWinStats(userName)[1] < 20:
-            send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played and a 45% win ratio.")
+            send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played.")
         else:
             user['status'] = 'captain'
     user['nick'] = userName
@@ -387,7 +391,10 @@ def extractClasses(userCommand):
     return classes
 
 def extractUserName(user):
-    return string.split(user, '!')[0]
+    if user:
+        return string.split(user, '!')[0]
+    else:
+        return ''
 
 def findAwayUsers():
     global awayList, userList
@@ -691,12 +698,16 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
-    whoisData = whois(userName)
-    if (len(whoisData) and (re.search('@' + channel + ' ', whoisData['channel']) or re.search('@' + channel + '$', whoisData['channel']))) or (len(whoisData) and (re.search('\+' + channel + ' ', whoisData['channel']) or re.search('\+' + channel + '$', whoisData['channel']))):
-    # User is an admin.
-        return 1
-    else :
-    # User is not an admin.
+    global adminList
+    server.send_raw("PRIVMSG ChanServ :" + channel + " a " + userName)
+    counter = 0
+    while not userName in adminList and counter < 20:
+        irc.process_once(0.2)
+        counter += 1
+    print adminList
+    if userName in adminList:
+        return adminList[userName]
+    else:
         return 0
 
 def isAdminCommand(userName, userCommand):
@@ -837,10 +848,10 @@ def limit(userName, userCommand):
         if int(commandList[1]) < 12:
             send("NOTICE " + userName + " : The limit value must be equal or above 12.")
             return 0
-        """if int(commandList[1]) > 18:
-            send("NOTICE " + userName + " : The maximum limit is at 18. And please, don't restart the bot or the PUG.")
-            userLimit = 18
-            return 0"""
+        if int(commandList[1]) > 15:
+            send("NOTICE " + userName + " : The maximum limit is at 15. And please, don't restart the bot or the PUG.")
+            userLimit = 15
+            return 0
     except:
         return 0
     userLimit = int(commandList[1])
@@ -1016,7 +1027,7 @@ def players(userName):
     printCaptainChoices('channel')
 
 def pubmsg(connection, event):
-    analyseCommand(connection, event)
+    analyseIRCText(connection, event)
 
 def printCaptainChoices(printType = 'private'):
     global classList, captainStage, captainStageList, userList
@@ -1125,7 +1136,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    print 'prototype'
+    send("PRIVMSG " + channel + " :pro\x02totype")
 
 def readPasswords():
     global rconPassword, tf2pbPassword
@@ -1201,12 +1212,6 @@ def removeLastEscapeCharacter(userCommand):
         userCommand = userCommand[0:len(userCommand) - 1]
     return userCommand
 
-def resetUserVariables():
-    global userAuth, userInfo, userName
-    userAuth = []
-    userChannel = []
-    userInfo = []
-
 def resetVariables():
     global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
@@ -1233,6 +1238,13 @@ def saveStats():
             cursor = connection.cursor()
             cursor.execute('INSERT INTO stats VALUES (%s, %s, %s, %s, %s)', (user['class'][0], user['nick'], "0", initTime, botID))
             cursor.execute('COMMIT;')
+
+def saveToLogs(data):
+    logFile = open(channel.replace('#', '') + ".log", 'a')
+    try:
+        logFile.write(data)
+    finally:
+        logFile.close()
 
 def scramble(userName, force = 0):
     global scrambleList, teamA, teamB, userList
@@ -1426,49 +1438,6 @@ def welcome(connection, event):
     server.send_raw("MODE " + nick + " +x")
     server.join(channel)
 
-def whois(userName):
-    resetUserVariables()
-    global userAuth, userChannel, userInfo, whoisEnded
-    counter = 0
-    whoisEnded = 0
-    server.whois([userName])
-    while not whoisEnded and counter < 20:
-        irc.process_once(0.2)
-        counter += 1
-    if whoisEnded and len(userInfo):
-        whoisData = {'auth':userAuth, 'channel':userChannel, 'info':userInfo}
-    else:
-        whoisData = {}
-    print whoisData
-    return whoisData
-
-def whoisauth(connection, event):
-    global userAuth
-    print 'Whois Auth'
-    print event.arguments()
-    for i in event.arguments():
-        userAuth.append(i)
-
-def whoischannels(connection, event):
-    global userChannel
-    print 'Whois Channel'
-    print event.arguments()
-    if re.search('#', event.arguments()[1]):
-        userChannel = event.arguments()[1]
-        return 0
-
-def whoisend(connection, event):
-    global whoisEnded
-    print 'Whois End'
-    whoisEnded = 1
-
-def whoisuser(connection, event):
-    global userInfo
-    print 'Whois Info'
-    print event.arguments()
-    for i in event.arguments():
-        userInfo.append(i)
-
 # Connection information
 network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
@@ -1477,6 +1446,7 @@ nick = 'PUG-BOT'
 name = 'BOT'
 
 adminCommands = ["\\!addgame", "\\!automatic", "\\!endgame", "\\!force", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart"]
+adminList = {}
 allowFriends = 1
 awayList = {}
 awayTimer = 0.0
@@ -1494,7 +1464,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_granary", "cp_freight"]
+mapList = ["cp_badlands", "cp_coldfront_rc2", "cp_freight_final1", "cp_granary", "koth_viaduct"]
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1511,13 +1481,9 @@ startGameTimer = threading.Timer(0, None)
 subList = []
 tf2pbPassword = ''
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
-userAuth = []
-userChannel = []
-userInfo = []
 userLimit = 15
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
-whoisEnded = 0
 
 readPasswords()
 
@@ -1534,16 +1500,14 @@ connect()
 
 irc.add_global_handler('dcc_disconnect', drop)
 irc.add_global_handler('disconnect', drop)
-irc.add_global_handler('endofwhois', whoisend)
 irc.add_global_handler('kick', drop)
 irc.add_global_handler('nick', nickchange)
 irc.add_global_handler('part', drop)
 irc.add_global_handler('pubmsg', pubmsg)
+irc.add_global_handler('privnotice', pubmsg)
+irc.add_global_handler('pubnotice', pubmsg)
 irc.add_global_handler('quit', drop)
 irc.add_global_handler('welcome', welcome)
-irc.add_global_handler('whoisauth', whoisauth)
-irc.add_global_handler('whoischannels',whoischannels)
-irc.add_global_handler('whoisuser',whoisuser)
 
 # Start the server listening.
 thread.start_new_thread(listeningTF2Servers, ())
