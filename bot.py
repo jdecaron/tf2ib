@@ -580,7 +580,7 @@ def getMedicStats(userName):
     cursor.execute('SELECT lower(nick), count(*), sum(result) FROM stats where nick ILIKE %s AND class = \'medic\' AND botID = %s GROUP BY lower(nick)', (userName, botID))
     for row in cursor.fetchall():
         medicStats['totalGamesAsMedic'] = row[1]
-        medicStats['medicWinRatio'] = float(float(row[2]) + float(medicStats['totalGamesAsMedic']) / float(medicStats['totalGamesAsMedic'] * 2))
+        medicStats['medicWinRatio'] = float((float(row[2]) + float(row[1])) / float(row[1] * 2))
     return medicStats
 
 def getNextPlayerID():
