@@ -17,7 +17,13 @@ def add(userName, userCommand, ninjAdd = 0):
     global state, userLimit, userList
     print "State : " + state
     if state != 'idle':
-        userAuthorizationLevel = isAuthorizedToAdd(userName)
+        winStats = getWinStats(userName)
+        medicStats = getMedicStats(userName)
+        print medicStats
+        if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
+            send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
+            return 0
+        userAuthorizationLevel = isAuthorizedToAdd(userName, userCommand)
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
             return 0
@@ -37,12 +43,14 @@ def add(userName, userCommand, ninjAdd = 0):
                     send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(availableClasses) + ".")
                     return 0
             if ((len(userList) == (userLimit -2) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
-                if userAuthorizationLevel == 2:
+                if not isUser(userName) and userAuthorizationLevel == 2:
                     userLimit = userLimit + 1
                 elif not isUser(userName):
                     stats(userName, "!stats " + userName)
                     send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                     return 0
+            if not isUser(userName) and len(userList) == userLimit and userAuthorizationLevel == 2:
+                userLimit = userLimit + 1
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand)
@@ -125,7 +133,7 @@ def analyseIRCText(connection, event):
     saveToLogs("[" + time.ctime() + "] <" + userName + "> " + userCommand + "\n")
     if userName in userList:
         updateUserStatus(userName, escapedUserCommand)
-    if re.match('^.*\\\\ \\\\\(.*\\\\\)\\\\ has\\\\ access\\\\ \\\\\x02\d\d\d\\\\\x02\\\\ in\\\\ \\\\' + escapedChannel + '\\\\.$', escapedUserCommand):
+    if re.match('^.*\\\\ \\\\\(.*\\\\\)\\\\ has\\\\ access\\\\ \\\\\x02\d*\\\\\x02\\\\ in\\\\ \\\\' + escapedChannel + '\\\\.$', escapedUserCommand):
         adminList[userCommand.split()[0]] = int(userCommand.split()[4].replace('\x02', ''))
     if re.match('^\\\\!', escapedUserCommand):
     # Check if the user is trying to pass a command to the bot.
@@ -763,13 +771,9 @@ def isAuthorizedCaptain(userName):
             return 1
     return 0
 
-def isAuthorizedToAdd(userName):
+def isAuthorizedToAdd(userName, userCommand = ''):
     authorizationStatus = getAuthorizationStatus(userName)
     winStats = getWinStats(userName)
-    """medicStats = getMedicStats(userName)
-    if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[1]) < 0.05)):
-        send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-        return 0"""
     if authorizationStatus[1] > 1:
         return authorizationStatus[1]
     elif authorizationStatus[1] == 1:
@@ -1538,7 +1542,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_coldfront_rc2", "cp_freight_final1", "cp_granary", "koth_viaduct"]
+mapList = ["cp_badlands", "cp_freight_final1", "cp_granary", "koth_viaduct"]
 maximumUserLimit = 15
 minuteTimer = time.time()
 nominatedCaptains = []
