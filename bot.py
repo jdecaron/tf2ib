@@ -23,7 +23,7 @@ def add(userName, userCommand, ninjAdd = 0):
         if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
-        userAuthorizationLevel = isAuthorizedToAdd(userName, userCommand)
+        userAuthorizationLevel = isAuthorizedToAdd(userName)
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
             return 0
@@ -771,7 +771,7 @@ def isAuthorizedCaptain(userName):
             return 1
     return 0
 
-def isAuthorizedToAdd(userName, userCommand = ''):
+def isAuthorizedToAdd(userName):
     authorizationStatus = getAuthorizationStatus(userName)
     winStats = getWinStats(userName)
     if authorizationStatus[1] > 1:
