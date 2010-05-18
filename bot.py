@@ -16,6 +16,7 @@ import time
 def add(userName, userCommand, ninjAdd = 0):
     global state, userLimit, userList
     print "State : " + state
+    userAuthorizationLevel = isAuthorizedToAdd(userName)
     if state != 'idle':
         winStats = getWinStats(userName)
         medicStats = getMedicStats(userName)
@@ -23,7 +24,6 @@ def add(userName, userCommand, ninjAdd = 0):
         if not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
-        userAuthorizationLevel = isAuthorizedToAdd(userName)
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
             return 0
@@ -51,6 +51,7 @@ def add(userName, userCommand, ninjAdd = 0):
                     return 0
             if not isUser(userName) and len(userList) == userLimit and userAuthorizationLevel == 2:
                 userLimit = userLimit + 1
+            remove(userName)
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand)
@@ -75,10 +76,15 @@ def add(userName, userCommand, ninjAdd = 0):
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
                     sendMessageToAwayPlayers()
-        elif state == 'picking' and not isUserCountOverLimit():
+        elif state == 'picking':
             if initTimer.isAlive():
                 if isInATeam(userName):
                     return 0
+                if isUserCountOverLimit():
+                    if userAuthorizationLevel == 1:
+                        return 0
+                    elif not isUser(userName) and userAuthorizationLevel == 2:
+                        userLimit = userLimit + 1
                 userList[userName] = createUser(userName, userCommand)
                 printUserList()
             else:
@@ -191,6 +197,13 @@ def authorize(userName, userCommand, userLevel = 1):
         return 0
     adminLevel = isAdmin(userName)
     authorizationStatus = getAuthorizationStatus(commandList[1])
+    authorizationText = ''
+    if userLevel == 0:
+        authorizationText = 'restricted'
+    elif userLevel == 1:
+        authorizationText = 'authorized'
+    else:
+        authorizationText = 'invited'
     if userLevel > 1 and adminLevel <= 250:
         send("NOTICE " + userName + " : Error, you lack access to this command.") 
         return 0
@@ -201,7 +214,7 @@ def authorize(userName, userCommand, userLevel = 1):
         cursor = connection.cursor()
         cursor.execute('INSERT INTO authorizations VALUES (%s, %s, %s, %s, %s)', (commandList[1], userLevel, adminLevel, time.time(), userName))
         cursor.execute('COMMIT;')
-        send("NOTICE " + userName + " : You successfully authorized \"" + commandList[1] + "\" to play in \"" + channel + "\".") 
+        send("NOTICE " + userName + " : You successfully " + authorizationText + " \"" + commandList[1] + "\" to play in \"" + channel + "\".") 
 
 def autoGameStart():
     global botID, connection, lastGameType, nick, startMode, state
@@ -777,14 +790,14 @@ def isAuthorizedToAdd(userName):
     if authorizationStatus[1] > 1:
         return authorizationStatus[1]
     elif authorizationStatus[1] == 1:
-        if winStats[3] <= 0.40 and authorizationStatus[3] + (60 * 60 * 24 * 14) < time.time():
+        if winStats[3] <= 0.35 and authorizationStatus[3] + (60 * 60 * 24 * 14) < time.time():
             return 0
         else:
             return authorizationStatus[1]
     elif authorizationStatus[2] > 0:
         return 0
     elif winStats[1]:
-        if winStats[1] == 20 and winStats[3] <= 0.40:
+        if winStats[1] == 20 and winStats[3] <= 0.35:
             return 0
         else:
             return 1
@@ -1440,7 +1453,7 @@ def stats(userName, userCommand):
     else:
         authorizationStatus = ''
     if not winStats[1]:
-        send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".')
+        send("PRIVMSG " + channel + ' :\x030,01No stats are available for the user "' + commandList[1] + '".' + authorizationStatus)
         return 0
     medicRatio = int(float(medicStats['totalGamesAsMedic']) / float(winStats[4]) * 100)
     winRatio = int(winStats[3] * 100)
