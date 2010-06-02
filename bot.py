@@ -21,7 +21,7 @@ def add(userName, userCommand, ninjAdd = 0):
         winStats = getWinStats(userName)
         medicStats = getMedicStats(userName)
         print medicStats
-        if userAuthorizationLevel != 2 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
+        if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
         if not userAuthorizationLevel:
@@ -1584,7 +1584,7 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_freight_final1", "cp_granary", "koth_viaduct"]
+mapList = ["cp_badlands", "cp_gullywash", "cp_freight_final1", "cp_granary", "koth_viaduct"]
 maximumUserLimit = 20
 minuteTimer = time.time()
 nominatedCaptains = []
