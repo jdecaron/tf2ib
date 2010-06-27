@@ -49,19 +49,16 @@ def add(userName, userCommand, ninjAdd = 0):
                     stats(userName, "!stats " + userName)
                     send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                     return 0
-            if userAuthorizationLevel <= 2 and countProtectedUsers()[1] >= 10 and classCount('medic') < 2 and not isMedic(userCommand):
-                send("NOTICE " + userName + " : This PUG's full. The only class available is medic.")
-                return 0
-            elif userAuthorizationLevel == 3 and not isUser(userName) and len(userList) == userLimit:
+            if userAuthorizationLevel == 3 and not isUser(userName) and len(userList) == userLimit:
                 userLimit = userLimit + 1
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
-                if countCaptains() < 2:
+                """if countCaptains() < 2:
                     send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
-                    return 0
+                    return 0"""
                 if len(findAwayUsers()) == 0:
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
@@ -116,7 +113,7 @@ def addGame(userName, userCommand):
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
-        userLimit = 20
+        userLimit = 16
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
@@ -487,7 +484,7 @@ def game(userName, userCommand):
         return 0
     if mode[1] == 'captain':
         if state == 'scrim':
-            captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+            captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
             state = 'captain'
         else:
             send("NOTICE " + userName + " :You can't switch the game mode in this bot state.")
@@ -937,7 +934,7 @@ def limit(userName, userCommand):
             return 0
         if int(commandList[1]) > maximumUserLimit:
             send("NOTICE " + userName + " : The maximum limit is at " + str(maximumUserLimit) + ". And please, don't restart the bot or the PUG.")
-            userLimit = 20
+            userLimit = 16
             return 0
     except:
         return 0
@@ -1092,9 +1089,6 @@ def pick(userName, userCommand):
     if gameClass == '':
         send("NOTICE " + userName + " : Error, you must specify a class from this list : " +  ', '.join(getRemainingClasses()) + ".")
         return 0
-    if gameClass != 'medic' and countProtectedUsers()[0] + countProtectedUsers()[1] > 0 and userList[commandList[0]]['authorization'] < 2:
-        send("NOTICE " + userName + " : Error, you must select the protected users first.")
-        return 0
     if gameClass not in getRemainingClasses():
         send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses()))
         return 0
@@ -1139,8 +1133,8 @@ def printCaptainChoices(printType = 'private'):
         for userName in userList.copy():
             if gameClass in userList[userName]['class']:
                 protected = ''
-                if userList[userName]['authorization'] > 1 and printType == 'private':
-                    protected = protectedColor + 'P' + followingColor
+                """if userList[userName]['authorization'] > 1 and printType == 'private':
+                    protected = protectedColor + 'P' + followingColor"""
                 choiceList.append("(" + str(getPlayerNumber(userName)) + protected + ")" + userName)
         if len(choiceList):
             send(dataPrefix + gameClass.capitalize() + "s: " + ', '.join(choiceList)) 
@@ -1150,8 +1144,8 @@ def printCaptainChoices(printType = 'private'):
         if userList[userName]['status'] == 'captain':
             captain = captainColor + 'C' + followingColor
         protected = ''
-        if userList[userName]['authorization'] > 1:
-            protected = protectedColor + 'P' + followingColor
+        """if userList[userName]['authorization'] > 1:
+            protected = protectedColor + 'P' + followingColor"""
         choiceList.append("(" + str(getPlayerNumber(userName)) + captain + protected + ")" + userName)
     send(dataPrefix +  str(len(choiceList))+ " user(s) : " + ', '.join(choiceList)) 
 
@@ -1219,10 +1213,10 @@ def printUserList():
             userStatus = ''
             if user['status'] == 'captain':
                 userStatus = '(\x038,01C\x030,01'
-            if user['authorization'] > 1:
+            """if user['authorization'] > 1:
                 if userStatus == '':
                     userStatus = '('
-                userStatus = userStatus + '\x039,01P\x030,01'
+                userStatus = userStatus + '\x039,01P\x030,01'"""
             if userStatus != '':
                 userStatus = userStatus + ')'
             message += ' "' + userStatus + user['nick'] + '"'
@@ -1319,7 +1313,7 @@ def resetVariables():
     global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
-    captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+    captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
     gameServer = ''
     removeUnremovedUsers()
     teamA = []
@@ -1572,7 +1566,7 @@ awayList = {}
 awayTimer = 0.0
 botID = 0
 captainStage = 0
-captainStageList = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'] 
+captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
 classList = ['demo', 'medic', 'scout', 'soldier']
 connectTimer = threading.Timer(0, None)
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
@@ -1585,7 +1579,7 @@ lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
 mapList = ["cp_badlands", "cp_gullywash", "cp_freight_final1", "cp_granary", "koth_viaduct"]
-maximumUserLimit = 20
+maximumUserLimit = 16
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1602,7 +1596,7 @@ startGameTimer = threading.Timer(0, None)
 subList = []
 tf2pbPassword = ''
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
-userLimit = 20
+userLimit = 16
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 
