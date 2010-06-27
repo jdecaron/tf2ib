@@ -329,7 +329,7 @@ gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "
 mapList = ["cp_badlands", "cp_follower", "cp_gravelpit", "cp_gullywash", "cp_freight_final1", "cp_granary", "cp_yukon", "ctf_turbine", "koth_viaduct"]
 rconPassword = ''
 restart = 0
-serverPasswords = []
+serverPasswords = ["heavymachinegun"]
 userCommands = ["\\!changelevel", "\\!config", "\\!map", "\\!kick"]
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 
