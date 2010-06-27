@@ -329,7 +329,11 @@ gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "
 mapList = ["cp_badlands", "cp_follower", "cp_gravelpit", "cp_gullywash", "cp_freight_final1", "cp_granary", "cp_yukon", "ctf_turbine", "koth_viaduct"]
 rconPassword = ''
 restart = 0
+<<<<<<< HEAD:scrim.py
 serverPasswords = ["heavymachinegun", "jetpack", "offensechamber", "chipotle", "lightninggun", "entourage", "california", "vmars", "gotfraggon", "bdropped", "miguelo", "steven", "haffey", "carbon", "sherwood", "foil", "broskow", "kansas", "dailybread", "habs", "eulogy", "valo", "remz", "poutine", "montreal", "sauce", "koubis", "nopole", "mrbishop", "quebec", "chadgap", "railfest", "banquise", "bebe"]
+=======
+serverPasswords = []
+>>>>>>> test3:scrim.py
 userCommands = ["\\!changelevel", "\\!config", "\\!map", "\\!kick"]
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 
