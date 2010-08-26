@@ -16,9 +16,13 @@ do
 done
 for i in `find ./logs -name '*.log' | grep 'L.*[0-9]\.log'`;
 do
-    # Prepend the server name to the logs to guarantee they have unique files names in the stats page.
-    j=`echo $i | cut -dL -f2`;
-    mv $i ./logs/'chicago1_'$j;
+    # Verify if the file is open by the server proccess and prepend the server name to the logs
+    # to guarantee that they have unique files names in the stats page.
+    if test -z `fuser $i`
+    then
+        j=`echo $i | cut -dL -f2`;
+        mv $i ./logs/'dallas3_'$j;
+    fi
 done
 rsync -a --bwlimit=600 --max-size=30000000 ./demos/ tf2pug@tf2pug.org:~/demos.tf2pug.org
 rsync -a --bwlimit=600 --max-size=30000000 ./logs/ tf2pug@tf2pug.org:~/stats.tf2pug.org/logs
