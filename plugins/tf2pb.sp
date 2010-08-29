@@ -25,11 +25,11 @@ new String:socketData[192];
 
 public Plugin:myinfo =
 {
-	name = "TF2PB",
+	name = "TF2IB",
 	author = "Jean-Denis Caron",
 	description = "Server side management for the PUG system.",
 	version = SOURCEMOD_VERSION,
-	url = "http://github.com/550/tf2pb/"
+	url = "http://github.com/550/tf2ib/"
 };
 
 public Action:checkForOffClassPlayers(Handle:timer){

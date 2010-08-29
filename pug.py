@@ -14,14 +14,14 @@ import time
 #irclib.DEBUG = 1
 
 def add(userName, userCommand, ninjAdd = 0):
-    global state, userLimit, userList
+    global firstCaptainWarning, state, userLimit, userList
     print "State : " + state
     userAuthorizationLevel = isAuthorizedToAdd(userName)
     if state != 'idle':
         winStats = getWinStats(userName)
         medicStats = getMedicStats(userName)
         print medicStats
-        if userAuthorizationLevel != 2 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
+        if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
         if not userAuthorizationLevel:
@@ -42,7 +42,8 @@ def add(userName, userCommand, ninjAdd = 0):
                 if userCommand.split()[1] not in availableClasses:
                     send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(availableClasses) + ".")
                     return 0
-            if ((len(userList) == (userLimit -2) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
+            remove(userName, 0)
+            if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
                 if not isUser(userName) and userAuthorizationLevel == 3:
                     userLimit = userLimit + 1
                 elif not isUser(userName):
@@ -56,9 +57,15 @@ def add(userName, userCommand, ninjAdd = 0):
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
-                """if countCaptains() < 2:
-                    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
-                    return 0"""
+                if countCaptains() < 2:
+                    if time.time() - firstCaptainWarning <= 3 * 60 or firstCaptainWarning == 0:
+                        if firstCaptainWarning == 0:
+                            firstCaptainWarning = time.time()
+                        send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
+                        return 0
+                    elif time.time() - firstCaptainWarning > 3 * 60 and time.time() - firstCaptainWarning <= 5 * 60:
+                        send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG will start with less than 2 volunteer captain, it will happen if nobody add as captain in the next " + str(int(((5 * 60) - (time.time() - firstCaptainWarning)))) + " seconds. By default medics are assigned the captain task.")
+                        return 0
                 if len(findAwayUsers()) == 0:
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
@@ -195,7 +202,7 @@ def authorize(userName, userCommand, userLevel = 1):
         send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid \"!authorize\" command : \"!authorize nick level\". The level is a value ranging from 0 to 500.")
         return 0
     adminLevel = isAdmin(userName)
-    if len(commandList) == 3 and re.match('^\d*$', commandList[2]) and int(commandList[2]) < adminLevel:
+    if len(commandList) == 3 and commandList[2] != '' and re.match('^\d*$', commandList[2]) and int(commandList[2]) < adminLevel:
         adminLevel = int(commandList[2])
     authorizationStatus = getAuthorizationStatus(commandList[1])
     authorizationText = ''
@@ -806,7 +813,7 @@ def isAuthorizedToAdd(userName):
     winStats = getWinStats(userName)
     if authorizationStatus[1] > 0:
         return authorizationStatus[1]
-    elif winStats[1]:
+    elif winStats[1] and authorizationStatus[2] == 0:
         return 1
     else:
         return 0
@@ -830,6 +837,12 @@ def isMedic(userCommand):
     else:
         return 0
 
+def isUser(userName):
+    if userName in userList:
+        return 1
+    else:
+        return 0
+
 def isUserCommand(userName, escapedUserCommand, userCommand):
     global userCommands
     escapedUserCommand = string.split(escapedUserCommand, ' ')[0]
@@ -849,12 +862,6 @@ def isUserCountOverLimit():
     else:
         return 1
 
-def isUser(userName):
-    if userName in userList:
-        return 1
-    else:
-        return 0
-
 def initGame():
     global gameServer, initTime, initTimer, nick, pastGames, scrambleList, startGameTimer, state, teamA, teamB
     if state == 'building' or state == 'picking':
@@ -871,7 +878,7 @@ def initGame():
         startGameTimer = threading.Timer(100, startGame)
         startGameTimer.start()
     elif state == "captain":
-        if countCaptains() < 2:
+        if countCaptains() < 2 and (firstCaptainWarning == 0 or time.time() - firstCaptainWarning < 5 * 60):
             return 0
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
@@ -1234,12 +1241,12 @@ def prototype():
     print userList
 
 def readPasswords():
-    global rconPassword, tf2pbPassword
+    global rconPassword, tf2ibPassword
     passwordFile = open("passwords.txt")
     try:
         passwords = passwordFile.readline().replace('\n', '').split(':')
         rconPassword = passwords[1]
-        tf2pbPassword = passwords[0]
+        tf2ibPassword = passwords[0]
     finally:
         passwordFile.close()
 
@@ -1279,7 +1286,7 @@ def replace(userName, userCommand):
         send("NOTICE " + userName + " : Error, the substitute you specified is not in the subscribed list.")
     return 0
 
-def remove(userName):
+def remove(userName, printUsers = 1):
     global initTimer, state, userLimit, userList
     if(isUser(userName)) and (state == 'picking' or state == 'building'):
         send("NOTICE " + userName + " : Warning, you removed but the teams are getting drafted at the moment and there are still some chances that you will get in this PUG. Make sure you clearly announce to the users in the channel and to the captains that you may need a substitute.")
@@ -1289,7 +1296,9 @@ def remove(userName):
             userLimit = userLimit - 1
         del userList[userName]
         initTimer.cancel()
-        printUserList()
+        if printUsers:
+            printUserList()
+
 
 def removeAwayUsers():
     global awayList, awayTimer
@@ -1310,10 +1319,11 @@ def removeLastEscapeCharacter(userCommand):
     return userCommand
 
 def resetVariables():
-    global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
+    global allowFriends, captainStage, captainStageList, firstCaptainWarning, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
     captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
+    firstCaptainWarning = 0
     gameServer = ''
     removeUnremovedUsers()
     teamA = []
@@ -1382,7 +1392,7 @@ def sendMessageToAwayPlayers():
     nickList = []
     for nick in awayList:
         nickList.append(nick)
-    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 " + words[0] + " considered as inactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
+    send("PRIVMSG " + channel + " :\x038,01Warning!\x030,01 " + words[0] + " considered as inactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
     for user in awayList:
         send("PRIVMSG " + user + ' :Warning, you are considered as inactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
 
@@ -1547,8 +1557,8 @@ def updateUserStatus(nick, escapedUserCommand):
             initGame()
 
 def welcome(connection, event):
-    global tf2pbPassword
-    server.send_raw("authserv auth " + nick + " " + tf2pbPassword)
+    global tf2ibPassword
+    server.send_raw("authserv auth " + nick + " " + tf2ibPassword)
     server.send_raw("MODE " + nick + " +x")
     server.join(channel)
 
@@ -1569,6 +1579,7 @@ captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
 classList = ['demo', 'medic', 'scout', 'soldier']
 connectTimer = threading.Timer(0, None)
+firstCaptainWarning = 0
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
 gameServer = ''
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
@@ -1578,13 +1589,8 @@ lastGame = 0
 lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-<<<<<<< HEAD:pug.py
-mapList = ["cp_badlands", "cp_gullywash", "cp_freight_final1", "cp_granary", "koth_viaduct"]
+mapList = ["cp_badlands", "cp_coldfront", "cp_gullywash_imp3", "cp_freight_final1", "cp_granary", "koth_viaduct"]
 maximumUserLimit = 16
-=======
-mapList = ["cp_badlands", "cp_freight_final1", "cp_granary", "koth_viaduct"]
-maximumUserLimit = 20
->>>>>>> 7e7fdab... Update the map list and fix the invite bug being force to medic.:bot.py
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
@@ -1599,7 +1605,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-tf2pbPassword = ''
+tf2ibPassword = ''
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 16
 userList = {}
@@ -1610,7 +1616,7 @@ readPasswords()
 #CREATE TABLE authorizations (nick varchar(255), authorized integer, level integer, time integer, admin varchar(255));
 #CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10), botID integer);
 #CREATE TABLE stats (class varchar(255), nick varchar(255), result integer, time integer, botID integer);
-connection = psycopg.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
+connection = psycopg.connect('dbname=tf2ib host=127.0.0.1 user=tf2ib password=' + tf2ibPassword)
 
 # Create an IRC object
 irc = irclib.IRC()

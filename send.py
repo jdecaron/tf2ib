@@ -8,8 +8,8 @@ import time
 irclib.DEBUG = 1
 
 def welcome(connection, event):
-    server.join("#tf2.pug")
     server.join("#tf2.pug.na")
+    server.join("#tf2scrim")
 
 nick = ''
 ip = ''
@@ -22,7 +22,7 @@ elif len(sys.argv) == 3:
 passwordFile = open("passwords.txt")
 try:
     passwords = passwordFile.readline().replace('\n', '').split(':')
-    tf2pbPassword = passwords[0]
+    tf2ibPassword = passwords[0]
 finally:
     passwordFile.close()
 
@@ -41,7 +41,7 @@ server.connect(network, port, nick, ircname = name, localaddress = ip)
 irc.add_global_handler('welcome', welcome)
 
 #CREATE TABLE messages(id SERIAL PRIMARY KEY, message TEXT);
-database = psycopg.connect('dbname=tf2pb host=localhost user=tf2pb password=' + tf2pbPassword)
+database = psycopg.connect('dbname=tf2ib host=localhost user=tf2ib password=' + tf2ibPassword)
 cursor = database.cursor()
 
 while 1:

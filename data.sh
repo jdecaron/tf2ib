@@ -1,10 +1,10 @@
 #!/bin/bash
-if [ -f /tmp/tf2pb ]
+if [ -f /tmp/tf2ib ]
 then
     # Run only one instance of the script on the host.
     exit
 fi
-touch /tmp/tf2pb
+touch /tmp/tf2ib
 cd /usr/local/games/steam/orangebox/tf
 for i in `find -maxdepth 1 -name "*\.dem"`
 do
@@ -28,4 +28,4 @@ rsync -a --bwlimit=600 --max-size=30000000 ./demos/ tf2pug@tf2pug.org:~/demos.tf
 rsync -a --bwlimit=600 --max-size=30000000 ./logs/ tf2pug@tf2pug.org:~/stats.tf2pug.org/logs
 for i in `find ./demos/ -maxdepth 1 -type f -mtime +1`; do rm $i; done
 for i in `find ./logs/ -maxdepth 1 -type f -mtime +30`; do rm $i; done
-rm /tmp/tf2pb
+rm /tmp/tf2ib
