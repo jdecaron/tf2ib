@@ -201,6 +201,7 @@ def listeningTF2Servers():
                     if server['ip'] == s['ip'] and s['players'] > 8:
                         servers[c]['active'] = 1
             c = c + 1
+        target = {'ip':'', 'name':'', 'players':0}
         for server in servers:
             if server['players'] >= target['players'] and not server['active']:
                 target = server
