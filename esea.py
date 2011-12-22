@@ -45,12 +45,8 @@ def connect():
     server.connect(network, port, nick, ircname = name)
 
 def createUser(userName, userCommand):
-    track = ''
-    if(re.search('^!track', userCommand)):
-        track = userCommand.split(' ')
-        track = track[1]
     commandList = string.split(userCommand, ' ')
-    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'last':0, 'nick':'', 'remove':0, 'status':'', 'team':'', 'track':track}
+    user = {'command':'', 'class':[], 'friends':{}, 'id':0, 'last':0, 'nick':'', 'remove':0, 'status':'', 'team':''}
     user['command'] = userCommand
     user['id'] = getNextPlayerID()
     user['last'] = time.time()
@@ -82,9 +78,6 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!remove', escapedUserCommand):
         remove(userName)
         return 0
-    if re.search('^\\\\!track$', escapedUserCommand) or re.search('^\\\\!track\\\\ ', escapedUserCommand):
-        track(userName, userCommand)
-        return 0
 
 def extractUserName(user):
     if user:
@@ -113,8 +106,7 @@ def getNextPlayerID():
 def getServers():
     cookies = cookielib.CookieJar()
     data = urllib.urlencode({'viewed_welcome_page':'1'})
-    #request = urllib2.Request("http://esea.net/index.php?s=servers&type=pug", headers={"Cookie" : "viewed_welcome_page=1"})
-    request = urllib2.Request("http://brouhaha:8000/esea.html", headers={"Cookie" : "viewed_welcome_page=1"})
+    request = urllib2.Request("http://esea.net/index.php?s=servers&type=pug", headers={"Cookie" : "viewed_welcome_page=1"})
     page = urllib2.urlopen(request).read()
     html = BeautifulSoup(page)
     html =  html.find("div", {"class":"content-block"})
@@ -173,7 +165,7 @@ def isUserCommand(userName, escapedUserCommand, userCommand):
     return 0
 
 def man():
-    message = "\x030,03This bot has 5 commands: !add !mumble !players !track !remove"
+    message = "\x030,03This bot has 5 commands: !add !mumble !players !remove"
     send("PRIVMSG " + channel + " :" + message)
 
 def mumble():
@@ -181,7 +173,7 @@ def mumble():
     send("PRIVMSG " + channel + " :" + message)
 
 def listeningTF2Servers():
-    global servers, target
+    global alert, servers
     last_minutes = []
     servers = []
     while 1:
@@ -192,34 +184,69 @@ def listeningTF2Servers():
             print "HTTP error."
             time.sleep(15)
             continue
-        if len(last_minutes) > 3:
+        if len(last_minutes) > 30:
             last_minutes.pop(0)
         c = 0
         for server in servers:
+            cl = 0
             for l in last_minutes:
                 for s in l:
-                    if server['ip'] == s['ip'] and s['players'] > 8:
-                        servers[c]['active'] = 1
+                    if server['ip'] == s['ip']:
+                        if s['players'] == 12:
+                            servers[c]['active'] = 1
+                        elif cl == len(last_minutes) - 1:
+                            # Alert when there's a few players needed.
+                            if cl > 1:
+                                for sp in last_minutes[cl - 1]:
+                                    if sp['ip'] == s['ip']:
+                                        if s['players'] >= sp['players'] and s['players'] >= 6 and s['active'] == 1:
+                                            sendMessage = 0
+                                            if s['ip'] in alerts:
+                                                if alerts[s['ip']]['dropped'] + (15 * 60) <= time.time():
+                                                    sendMessage = 1
+                                            else:
+                                                alerts[s['ip']] = dict(emptyAlert)
+                                                alerts[s['ip']]['dropped'] = time.time()
+                                                sendMessage = 1
+                                            if sendMessage:
+                                                for user in userList:
+                                                    send("PRIVMSG " + user + " :" + s['name'] + " (" + str(s['players']) + "/12) dropped a few players: connect " + s['ip'] + " or join from " + "http://esea.net/index.php?s=servers&id=" + s['name'].split(" ")[1])
+                        if s['ip'] in minimums:
+                            if s['players'] < minimums[s['ip']]:
+                                minimums[s['ip']] = s['players']
+                        else:
+                            minimums[s['ip']] = s['players']
+                cl = cl + 1
             c = c + 1
-        target = {'ip':'', 'name':'', 'players':0}
-        for server in servers:
-            if server['players'] >= target['players'] and not server['active']:
-                target = server
-            removeFromTracking = []
-            for user in userList:
-                if server['name'].replace(" ", "").lower() == userList[user]['track'] and server['players'] < 12:
-                    removeFromTracking.append(user)
-            for remove in removeFromTracking:
-                send("PRIVMSG " + remove + ' :The server you are tracking (' + server['name'] + ') has a free spot.')
-                userList[remove]['track'] = ''
-        if getUserCount() + target['players'] >= 12:
-            if len(findAwayUsers()) == 0:
-                startGame()
-            elif type(awayTimer).__name__ == 'float':
-                sendMessageToAwayPlayers()
-        print str(getUserCount()) + " " + str(target['players'])
-        print target
-        time.sleep(15)
+        for s in servers:
+            if s['ip'] in minimums and s['active'] == 0 and s['players'] - minimums[s['ip']] >= 3:
+                # Player increase.
+                sendMessage = 0
+                if s['ip'] in alerts:
+                    if alerts[s['ip']]['increasing'] + (15 * 60) <= time.time():
+                        sendMessage = 1
+                else:
+                    alerts[s['ip']] = dict(emptyAlert)
+                    sendMessage = 1
+                if sendMessage:
+                    for user in userList:
+                        alerts[s['ip']]['increasing'] = time.time()
+                        send("PRIVMSG " + user + " :" + s['name'] + " (" + str(s['players']) + "/12) had a player increase in the last couple minutes: connect " + s['ip'] + " or join from " + "http://esea.net/index.php?s=servers&id=" + s['name'].split(" ")[1])
+            if s['active'] == 0 and s['players'] + len(userList) >= 12:
+                # Enough players.
+                sendMessage = 0
+                if s['ip'] in alerts:
+                    if alerts[s['ip']]['enough'] + (15 * 60) <= time.time():
+                        sendMessage = 1
+                else:
+                    alerts[s['ip']] = dict(emptyAlert)
+                    sendMessage = 1
+                if sendMessage:
+                    for user in userList:
+                        alerts[s['ip']]['enough'] = time.time()
+                        send("PRIVMSG " + user + " :" + s['name'] + " (" + str(s['players']) + "/12), the players on that server combined with the players added in the channel are enough to start a PUG: connect " + s['ip'] + " or join from " + "http://esea.net/index.php?s=servers&id=" + s['name'].split(" ")[1])
+        print alerts
+        time.sleep(30)
 
 def needsub(userName, userCommand):
     global classList, subList
@@ -280,10 +307,15 @@ def printUserList():
     print userList
     global lastUserPrint, printTimer
     if (time.time() - lastUserPrint) > 5:
-        message = "\x030,03" + str(target['players']) + " players on " + target['name'] + " & " + str(len(userList)) + " user(s) subscribed :"
+        message = "\x030,03" + str(len(userList)) + " user(s) subscribed :"
         for i, user in userList.copy().iteritems():
             message += ' "' + user['nick'] + '"'
         send("PRIVMSG " + channel + " :" + message)
+        filled = []
+        for s in servers:
+            if s['players'] > 0:
+                filled.append(s['name'] + " (" + str(s['players']) + "/12)")
+        send("PRIVMSG " + channel + " :\x030,03Servers: " + ", ".join(filled))
     else:
         printTimer.cancel()
         printTimer = threading.Timer(5, printUserList)
@@ -366,35 +398,6 @@ def sendMessageToAwayPlayers():
     for user in awayList:
         send("PRIVMSG " + user + ' :Warning, you are considered as inactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
 
-def sendStartPrivateMessages():
-    toRemove = []
-    for user in userList:
-        toRemove.append(user) 
-        send("PRIVMSG " + user + " :Connect as soon as possible to this TF2 server (" + target['name'] + "): " + target['ip'])
-    for user in toRemove:
-        remove(user)
-
-def startGame():
-    sendStartPrivateMessages()
-
-def track(userName, userCommand):
-    s = userCommand.split(" ")
-    if len(s) > 1:
-        found = ''
-        s.pop(0)
-        s = ''.join(s)
-        s = s.lower()
-        for server in servers:
-            sn = server['name'].replace(" ", "").lower()
-            if s == sn:
-                found = s
-        if found == '':
-            send("NOTICE " + userName + " : " + "Error! The server you specified isn't on the list.")
-        else:
-            add(userName, "!track " + s)
-    else:
-        send("NOTICE " + userName + " : " + "Error! You need to specify the server you want to track. Example: !add Illinois126")
-
 def updateUserStatus(nick, escapedUserCommand):
     global awayList, userList
     if re.search('^\\\\!away', escapedUserCommand) and nick in userList:
@@ -412,20 +415,23 @@ def welcome(connection, event):
     server.join(channel)
 
 # Connection information
-network = 'brouhaha'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 channel = '#esea.tf2'
 nick = 'PUG-ESEA'
 name = 'BOT'
 
+alerts = {}
 awayList = {}
 awayTimer = 0.0
 botID = 0
 connectTimer = threading.Timer(0, None)
+emptyAlert = {'dropped':0, 'enough':0, 'increasing':0}
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
 initTime = int(time.time())
 initTimer = threading.Timer(0, None)
 lastUserPrint = time.time()
+minimums = {}
 minuteTimer = time.time()
 printTimer = threading.Timer(0, None)
 startMode = 'automatic'
@@ -435,8 +441,7 @@ startGameTimer = threading.Timer(0, None)
 password = ''
 servers = []
 subList = []
-target = {'ip':'', 'name':'', 'players':0}
-userCommands = ["\\!add", "\\!man", "\\!mumble", "\\!players", "\\!remove", "\\!track"]
+userCommands = ["\\!add", "\\!man", "\\!mumble", "\\!players", "\\!remove"]
 userLimit = 16
 userList = {}
 voiceServer = {'ip':'208.100.4.87', 'port':'64793'}
