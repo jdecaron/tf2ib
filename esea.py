@@ -36,6 +36,7 @@ def checkConnection():
     global connectTimer
     if not server.is_connected():
         connect()
+    server.join(channel)
 
 def cleanUserCommand(command):
     return re.escape(command)

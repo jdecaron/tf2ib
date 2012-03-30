@@ -1,15 +1,23 @@
 #!/usr/bin/python
 
 import irclib
-import psycopg
+import psycopg2
 import sys
 import time
 
 irclib.DEBUG = 1
 
+def checkConnection():
+    global connectTimer
+    if not server.is_connected():
+        connect()
+    server.join("#esea.tf2")
+
+def connect():
+    server.connect(network, port, nick, ircname = name)
+
 def welcome(connection, event):
-    server.join("#tf2.pug.na")
-    server.join("#tf2scrim")
+    server.join("#esea.tf2")
 
 nick = ''
 ip = ''
@@ -29,7 +37,6 @@ finally:
 # Connection information
 network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
-channel = '#tf2.pug.na'
 name = 'BOT'
 
 # Create an IRC object
@@ -40,9 +47,9 @@ server = irc.server()
 server.connect(network, port, nick, ircname = name, localaddress = ip)
 irc.add_global_handler('welcome', welcome)
 
-#CREATE TABLE messages(id SERIAL PRIMARY KEY, message TEXT);
-database = psycopg.connect('dbname=tf2ib host=localhost user=tf2ib password=' + tf2ibPassword)
+database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + tf2ibPassword)
 cursor = database.cursor()
+minuteTimer = time.time()
 
 while 1:
     cursor.execute('BEGIN;')
@@ -55,3 +62,6 @@ while 1:
         server.send_raw(row[1])
     cursor.execute('COMMIT;')
     irc.process_once(0.2)
+    if time.time() - minuteTimer > 60:
+        minuteTimer = time.time()
+        checkConnection()
