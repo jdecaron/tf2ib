@@ -2,7 +2,7 @@
 
 import irclib
 import math
-import psycopg
+import psycopg2
 import random
 import re
 import string
