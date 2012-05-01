@@ -11,13 +11,13 @@ def checkConnection():
     global connectTimer
     if not server.is_connected():
         connect()
-    server.join("#esea.tf2")
+    server.join("#tf2.pug.na")
 
 def connect():
     server.connect(network, port, nick, ircname = name)
 
 def welcome(connection, event):
-    server.join("#esea.tf2")
+    server.join("#tf2.pug.na")
 
 nick = ''
 ip = ''
@@ -35,7 +35,7 @@ finally:
     passwordFile.close()
 
 # Connection information
-network = 'Gameservers.NJ.US.GameSurge.net'
+network = '127.0.0.1'
 port = 6667
 name = 'BOT'
 

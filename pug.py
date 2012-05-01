@@ -1,4 +1,4 @@
-#!/usr/bin/python
+2!/usr/bin/python
 
 import irclib
 import math
@@ -52,6 +52,9 @@ def add(userName, userCommand, ninjAdd = 0):
                     return 0
             if userAuthorizationLevel == 3 and not isUser(userName) and len(userList) == userLimit:
                 userLimit = userLimit + 1
+            if len(extractClasses(userCommand)) == 0:
+                send("NOTICE " + userName + " : " + "Error! You need to specify a class. Example : \"!add scout\"."")
+                return 0
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
@@ -120,7 +123,7 @@ def addGame(userName, userCommand):
         classList = ['demo', 'medic', 'scout', 'soldier']
         lastGameType = 'captain'
         state = 'captain'
-        userLimit = 16
+        userLimit = 24
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
@@ -313,10 +316,9 @@ def countProtectedUsers():
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name, localaddress = '69.164.199.15')
+    server.connect(network, port, nick, ircname = name, localaddress = '127.0.0.1')
 
 def createUser(userName, userCommand, userAuthorizationLevel):
-    global classList, state
     commandList = string.split(userCommand, ' ')
     user = {'authorization': userAuthorizationLevel, 'command':'', 'class':[], 'friends':{}, 'id':0, 'last':0, 'late':0, 'nick':'', 'remove':0, 'status':'', 'team':''}
     user['command'] = userCommand
@@ -334,8 +336,6 @@ def createUser(userName, userCommand, userAuthorizationLevel):
     if state == 'captain' or state == 'picking':
         if len(user['class']) > 0:
             send("NOTICE " + userName + " : " + "You sucessfully subscribed to the picking process as : " + ", ".join(user['class']) + ".")
-        else:
-            send("NOTICE " + userName + " : " + "You sucessfully subscribed to the picking process but you did not specify any valid class. Please specify one to help the captains chosing you as the right one.")
     return user
 
 def drop(connection, event):
@@ -779,6 +779,7 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
+    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + channel + " a " + userName)
     counter = 0
@@ -941,7 +942,7 @@ def limit(userName, userCommand):
             return 0
         if int(commandList[1]) > maximumUserLimit:
             send("NOTICE " + userName + " : The maximum limit is at " + str(maximumUserLimit) + ". And please, don't restart the bot or the PUG.")
-            userLimit = 16
+            userLimit = 24
             return 0
     except:
         return 0
@@ -1563,7 +1564,7 @@ def welcome(connection, event):
     server.join(channel)
 
 # Connection information
-network = 'Gameservers.NJ.US.GameSurge.net'
+network = '127.0.0.1'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -1590,11 +1591,12 @@ lastGameType = "captain"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
 mapList = ["cp_badlands", "cp_coldfront", "cp_gullywash_imp3", "cp_freight_final1", "cp_granary", "koth_viaduct"]
-maximumUserLimit = 16
+maximumUserLimit = 24
 minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
 pastGames = []
+playerCountPerClasses = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
 printTimer = threading.Timer(0, None)
 rconPassword = ''
 startMode = 'automatic'
@@ -1616,7 +1618,7 @@ readPasswords()
 #CREATE TABLE authorizations (nick varchar(255), authorized integer, level integer, time integer, admin varchar(255));
 #CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10), botID integer);
 #CREATE TABLE stats (class varchar(255), nick varchar(255), result integer, time integer, botID integer);
-connection = psycopg.connect('dbname=tf2ib host=127.0.0.1 user=tf2ib password=' + tf2ibPassword)
+connection = psycopg2.connect('dbname=tf2ib host=127.0.0.1 user=tf2ib password=' + tf2ibPassword)
 
 # Create an IRC object
 irc = irclib.IRC()
