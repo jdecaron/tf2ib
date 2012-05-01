@@ -1,4 +1,4 @@
-2!/usr/bin/python
+#!/usr/bin/python
 
 import irclib
 import math
@@ -14,34 +14,20 @@ import time
 #irclib.DEBUG = 1
 
 def add(userName, userCommand, ninjAdd = 0):
-    global firstCaptainWarning, state, userLimit, userList
+    global state, userLimit, userList
     print "State : " + state
     userAuthorizationLevel = isAuthorizedToAdd(userName)
     if state != 'idle':
         winStats = getWinStats(userName)
         medicStats = getMedicStats(userName)
         print medicStats
-        if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
+        """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access to add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
-            return 0
+            return 0"""
         if state == 'captain' or state == 'highlander' or state == 'normal':
-            if state == 'highlander' or state == 'normal':
-                if len(userCommand.split()) <= 1:
-                    send("NOTICE " + userName + " : You must specify a class you want to play with. Example : \"!add scout\".")
-                    return 0
-                if len(userCommand.split()) > 2:
-                    send("NOTICE " + userName + " : You can't add as multiple classes in this game mode.")
-                    return 0
-                if ninjAdd and userCommand.split()[1] in classList and not getNinjaddSpot(userCommand.split()[1]):
-                    send("NOTICE " + userName + " : There was no ninjadd spot available for this class, try an other one.")
-                    return 0
-                availableClasses = getAvailableClasses()
-                if userCommand.split()[1] not in availableClasses:
-                    send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(availableClasses) + ".")
-                    return 0
             remove(userName, 0)
             if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
                 if not isUser(userName) and userAuthorizationLevel == 3:
@@ -53,22 +39,24 @@ def add(userName, userCommand, ninjAdd = 0):
             if userAuthorizationLevel == 3 and not isUser(userName) and len(userList) == userLimit:
                 userLimit = userLimit + 1
             if len(extractClasses(userCommand)) == 0:
-                send("NOTICE " + userName + " : " + "Error! You need to specify a class. Example : \"!add scout\"."")
+                send("NOTICE " + userName + " : " + "Error! You need to specify a class. Example : \"!add scout\".")
+                return 0
+            elif len(extractClasses(userCommand)) > 1:
+                send("NOTICE " + userName + " : " + "Error! You can only add as one class.")
+                return 0
+            elif extractClasses(userCommand)[0] not in getAvailableClasses():
+                send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(getAvailableClasses()) + ".")
                 return 0
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
-                if countCaptains() < 2:
-                    if time.time() - firstCaptainWarning <= 3 * 60 or firstCaptainWarning == 0:
-                        if firstCaptainWarning == 0:
-                            firstCaptainWarning = time.time()
-                        send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
-                        return 0
-                    elif time.time() - firstCaptainWarning > 3 * 60 and time.time() - firstCaptainWarning <= 5 * 60:
-                        send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG will start with less than 2 volunteer captain, it will happen if nobody add as captain in the next " + str(int(((5 * 60) - (time.time() - firstCaptainWarning)))) + " seconds. By default medics are assigned the captain task.")
-                        return 0
+                if classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 3:
+                    return 0
+                if state == 'captain' and countCaptains() < 2:
+                    send("PRIVMSG " + channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
+                    return 0
                 if len(findAwayUsers()) == 0:
                     initGame()
                 elif type(awayTimer).__name__ == 'float':
@@ -230,7 +218,7 @@ def authorize(userName, userCommand, userLevel = 1):
         send("NOTICE " + userName + " : You successfully " + authorizationText + " \"" + commandList[1] + "\" to play in \"" + channel + "\".") 
 
 def autoGameStart():
-    global botID, connection, lastGameType, nick, startMode, state
+    global lastGameType
     if state == 'idle':
         server = getAvailableServer()
     else:
@@ -238,6 +226,10 @@ def autoGameStart():
     cursor = connection.cursor()
     cursor.execute('UPDATE servers SET last = 0 WHERE last < 0 AND botID = %s', (botID,))
     cursor.execute('COMMIT;')
+    if lastGameType == 'captain':
+        lastGameType = 'normal'
+    elif lastGameType == 'normal':
+        lastGameType = 'captain'
     if server and startMode == 'automatic':
         addGame(nick, '!addgame ' + lastGameType + ' ' + server['ip'] + ':' + server['port'])
 
@@ -266,6 +258,7 @@ def checkConnection():
     global connectTimer
     if not server.is_connected():
         connect()
+    server.join(channel)
 
 def classCount(gameClass):
     global userList
@@ -561,7 +554,10 @@ def getAuthorizationStatus(userName):
 
 def getAvailableClasses():
     availableClasses = []
-    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+    if userLimit == 12:
+        numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+    elif userLimit == 24:
+        numberOfPlayersPerClass = {'demo':4, 'medic':4, 'scout':8, 'soldier':8}
     if getTeamSize() == 9:
         numberOfPlayersPerClass = {'demo':2, 'engineer':2, 'heavy':2, 'medic':2, 'pyro':2, 'scout':2, 'sniper':2, 'soldier':2, 'spy':2}
     for gameClass in classList:
@@ -879,7 +875,7 @@ def initGame():
         startGameTimer = threading.Timer(100, startGame)
         startGameTimer.start()
     elif state == "captain":
-        if countCaptains() < 2 and (firstCaptainWarning == 0 or time.time() - firstCaptainWarning < 5 * 60):
+        if countCaptains() < 2:
             return 0
         send("PRIVMSG " + channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         state = 'picking'
@@ -1320,11 +1316,10 @@ def removeLastEscapeCharacter(userCommand):
     return userCommand
 
 def resetVariables():
-    global allowFriends, captainStage, captainStageList, firstCaptainWarning, gameServer, teamA, teamB, userLimit, userList
+    global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
     captainStage = 0
     captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
-    firstCaptainWarning = 0
     gameServer = ''
     removeUnremovedUsers()
     teamA = []
@@ -1554,6 +1549,8 @@ def updateUserStatus(nick, escapedUserCommand):
             userList[nick]['last'] = time.time()
         if nick in awayList:
             del awayList[nick]
+        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 3):
+            return 0
         if len(userList) >= numberOfPlayers and len(awayList) == 0 and classCount('medic') >= numberOfMedics:
             initGame()
 
@@ -1580,14 +1577,13 @@ captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
 classList = ['demo', 'medic', 'scout', 'soldier']
 connectTimer = threading.Timer(0, None)
-firstCaptainWarning = 0
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
 gameServer = ''
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
 initTime = int(time.time())
 initTimer = threading.Timer(0, None)
 lastGame = 0
-lastGameType = "captain"
+lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
 mapList = ["cp_badlands", "cp_coldfront", "cp_gullywash_imp3", "cp_freight_final1", "cp_granary", "koth_viaduct"]
@@ -1596,7 +1592,6 @@ minuteTimer = time.time()
 nominatedCaptains = []
 password = 'tf2pug'
 pastGames = []
-playerCountPerClasses = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
 printTimer = threading.Timer(0, None)
 rconPassword = ''
 startMode = 'automatic'
@@ -1609,7 +1604,7 @@ startGameTimer = threading.Timer(0, None)
 subList = []
 tf2ibPassword = ''
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
-userLimit = 16
+userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
 
