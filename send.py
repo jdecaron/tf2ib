@@ -35,7 +35,7 @@ finally:
     passwordFile.close()
 
 # Connection information
-network = '127.0.0.1'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 name = 'BOT'
 

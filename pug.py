@@ -309,7 +309,7 @@ def countProtectedUsers():
 
 def connect():
     global connectTimer, network, nick, name, port, server
-    server.connect(network, port, nick, ircname = name, localaddress = '127.0.0.1')
+    server.connect(network, port, nick, ircname = name)
 
 def createUser(userName, userCommand, userAuthorizationLevel):
     commandList = string.split(userCommand, ' ')
@@ -769,7 +769,7 @@ def ip(userName, userCommand):
     commandList = string.split(userCommand, ' ')
     if len(commandList) < 2:
         if gameServer != '':
-            message = "\x030,01Server IP : \"connect " + gameServer + "; password " + password + ";\". Servers are provided by AI : \x0307,01http://aigaming.com/"
+            message = "\x030,01Server IP : \"connect " + gameServer + "; password " + password + ";\". Servers are provided by Command Channel : \x0307,01https://commandchannel.com/"
             send("PRIVMSG " + channel + " :" + message)
         return 0
     setIP(userName, userCommand)
@@ -1092,7 +1092,7 @@ def pick(userName, userCommand):
     if gameClass == '':
         send("NOTICE " + userName + " : Error, you must specify a class from this list : " +  ', '.join(getRemainingClasses()) + ".")
         return 0
-    if gameClass not in userList[user]['class']:
+    if gameClass not in userList[commandList[0]]['class']:
         send("NOTICE " + userName + " : You must pick the user as the class he added.")
         return 0
     if gameClass not in getRemainingClasses():
@@ -1563,7 +1563,7 @@ def welcome(connection, event):
     server.join(channel)
 
 # Connection information
-network = '127.0.0.1'
+network = 'Gameservers.NJ.US.GameSurge.net'
 port = 6667
 channel = '#tf2.pug.na'
 nick = 'PUG-BOT'
@@ -1588,7 +1588,7 @@ lastGame = 0
 lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_coldfront", "cp_gullywash_imp3", "cp_freight_final1", "cp_granary", "koth_viaduct"]
+mapList = ["cp_badlands", "cp_gullywash_final1", "cp_snakewater", "cp_granary"]
 maximumUserLimit = 24
 minuteTimer = time.time()
 nominatedCaptains = []
@@ -1608,7 +1608,7 @@ tf2ibPassword = ''
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
-voiceServer = {'ip':'mumble.tf2pug.org', 'port':'64738'}
+voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
 
 readPasswords()
 
