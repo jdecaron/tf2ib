@@ -23,10 +23,10 @@ def add(userName, userCommand, ninjAdd = 0):
         print medicStats
         """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-            return 0
+            return 0"""
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access to add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
-            return 0"""
+            return 0
         if state == 'captain' or state == 'highlander' or state == 'normal':
             remove(userName, 0)
             if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
@@ -775,7 +775,6 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
-    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + channel + " a " + userName)
     counter = 0
@@ -1092,6 +1091,9 @@ def pick(userName, userCommand):
         return 0
     if gameClass == '':
         send("NOTICE " + userName + " : Error, you must specify a class from this list : " +  ', '.join(getRemainingClasses()) + ".")
+        return 0
+    if gameClass not in userList[user]['class']:
+        send("NOTICE " + userName + " : You must pick the user as the class he added.")
         return 0
     if gameClass not in getRemainingClasses():
         send("NOTICE " + userName + " : This class is full, pick an other one from this list : " +  ', '.join(getRemainingClasses()))
