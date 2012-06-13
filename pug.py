@@ -1612,9 +1612,6 @@ voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
 
 readPasswords()
 
-#CREATE TABLE authorizations (nick varchar(255), authorized integer, level integer, time integer, admin varchar(255));
-#CREATE TABLE servers (dns varchar(255), ip varchar(255), last integer, port varchar(10), botID integer);
-#CREATE TABLE stats (class varchar(255), nick varchar(255), result integer, time integer, botID integer);
 connection = psycopg2.connect('dbname=tf2ib host=127.0.0.1 user=tf2ib password=' + tf2ibPassword)
 
 # Create an IRC object

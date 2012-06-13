@@ -1,0 +1,6 @@
+This project has been developped on Linux. The installation instructions have been tested on Linux.
+
+1st step: configuring the database. I use PostgreSQL and I recommend it for this project.
+su postgres // This command need to be run as root.
+psql -c "CREATE DATABASE tf2ib"
+psql tf2ib < database.sql // Make sure to change the password in the file before executing this.
