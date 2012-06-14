@@ -4,6 +4,7 @@ This project has been developped on Linux. The installation instructions have be
 1st step: configuring the database. I use PostgreSQL and I recommend it for this project.
 ----------------------------------------
 su postgres // This command need to be run as root.
+psql -c "CREATE USER tf2ib WITH PASSWORD 'jw8s0F4'"
 psql -c "CREATE DATABASE tf2ib"
 psql tf2ib < database.sql // Make sure to change the password in the file before executing this.
 
