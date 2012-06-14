@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import config
 import irclib
 import psycopg2
 import sys
@@ -11,10 +12,10 @@ def checkConnection():
     global connectTimer
     if not server.is_connected():
         connect()
-    server.join("#tf2.pug.na")
+    server.join(config.channel)
 
 def connect():
-    server.connect(network, port, nick, ircname = name)
+    server.connect(config.network, config.port, nick, ircname = name)
 
 def welcome(connection, event):
     server.join("#tf2.pug.na")
@@ -27,27 +28,16 @@ elif len(sys.argv) == 3:
     nick = sys.argv[1]
     ip = sys.argv[2]
 
-passwordFile = open("passwords.txt")
-try:
-    passwords = passwordFile.readline().replace('\n', '').split(':')
-    tf2ibPassword = passwords[0]
-finally:
-    passwordFile.close()
-
-# Connection information
-network = 'Gameservers.NJ.US.GameSurge.net'
-port = 6667
-name = 'BOT'
-
 # Create an IRC object
+name = 'BOT'
 irc = irclib.IRC()
 
 # Create a server object, connect and join the channel
 server = irc.server()
-server.connect(network, port, nick, ircname = name, localaddress = ip)
+server.connect(config.network, config.port, nick, ircname = name, localaddress = ip)
 irc.add_global_handler('welcome', welcome)
 
-database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + tf2ibPassword)
+database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + config.databasePassword)
 cursor = database.cursor()
 minuteTimer = time.time()
 

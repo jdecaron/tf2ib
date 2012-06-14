@@ -1,6 +1,15 @@
-This project has been developped on Linux. The installation instructions have been tested on Linux.
+This project has been developped on Linux. The installation instructions have been tested on Linux. If you need a local IRC server I recommend you ngIRCD, I made a post about it there: http://stackoverflow.com/questions/144049/recommended-irc-server-ircd-for-a-small-site/990201#990201
+
 
 1st step: configuring the database. I use PostgreSQL and I recommend it for this project.
+----------------------------------------
 su postgres // This command need to be run as root.
 psql -c "CREATE DATABASE tf2ib"
 psql tf2ib < database.sql // Make sure to change the password in the file before executing this.
+
+
+2nd step: installing the necessary library and running the scripts. Before running those 2 scripts you need to change the value of some variabbles in the file "config.py"
+----------------------------------------
+aptitude install python-psycopg2 // You can use apt-get or yum, as long as you install properly the pyscopg2 library you are good to go.
+./pug.py
+./send.py PUG-MESSENGER // The second argument is the nickname of your messenger.
