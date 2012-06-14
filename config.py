@@ -7,4 +7,3 @@ port = 6667
 databasePassword = "jw8s0F4"
 gamesurgePassword = "password"
 rconPassword = "password"
-
