@@ -1,0 +1,167 @@
+/* CSS global.css */
+/* Sorry, no comments here, but the class names are pretty self-explanatory */
+
+a:link, a:visited {
+	color: #364c88;
+	text-decoration: none;
+}
+a:hover, a:active {
+	color: #da2229;
+	text-decoration: underline;
+}
+form {
+	margin: 0px;
+	padding: 0px;
+}
+input {
+	font-size: medium;
+}
+body {
+	background-color: #f2f2f2;
+	color: #000000;
+	font-family: Tahoma;
+	text-align: center;
+	padding: 0px;
+	margin: 0px;
+}
+div#container {
+	margin-left: auto;
+	margin-right: auto;
+	width: 100%;
+	text-align: left;
+}
+div.main {
+	width: 100%;
+	background-color: #FFFFFF;
+	border-bottom: 1px solid #bbbbbb;
+	padding: 0px;
+	margin: 0px;
+}
+div.topheader {
+	font: bold 21px Tahoma;
+	padding: 30px 5px 30px 25px;
+	color: #FFFFFF;
+	margin: 0px;
+	background-color: #111111;
+}
+div.content1 {
+	background-color: #FFFFFF;
+	padding: 0px 25px 25px 25px;
+	margin: 0px;
+	font-family: Tahoma;
+	font-size: 12px;
+	border: 1px solid #FFFFFF;
+}
+div.contentheader, div.contentheaderBlue {
+	font: bold 18px Tahoma;
+	color: #364c88;
+	border-bottom: 1px dashed #dddddd;
+	margin: 10px 0px 10px 0px;
+	padding: 0px;
+	letter-spacing: 1px;
+}
+div.contentheader2, div.contentheaderRed {
+	font: bold 18px Tahoma;
+	color: #da2229;
+	border-bottom: 1px dashed #dddddd;
+	margin: 10px 0px 10px 0px;
+	padding: 0px;
+	letter-spacing: 1px;
+}
+div.contentheader3 {
+	font: bold 18px Tahoma;
+	color: #555555;
+	border-bottom: 1px dashed #dddddd;
+	margin: 10px 0px 10px 0px;
+	padding: 0px;
+	letter-spacing: 1px;
+}
+div.footer {
+	font-family: Tahoma;
+	font-size: 12px;
+	text-align: center;
+	color: #cccccc;
+}
+.clear {
+	clear: both;
+}
+
+div.breadcrumbs {
+	margin-top: 10px;
+}
+
+td.Red { background-color: #da2229; color: #da2229; }
+td.Blue { background-color: #364c88; color: #364c88; }
+td.Black { background-color: #000000; color: #000000; }
+
+td.lineRed a:link, a:visited { color: #da2229; }
+td.lineRed a:hover, a:active {  }
+
+td.lineBlue a:link, a:visited { color: #364c88; }
+td.lineBlue a:hover, a:active {  }
+
+th.lineRed a:link, a:visited { color: #da2229; }
+th.lineRed a:hover, a:active {  }
+
+th.lineBlue a:link, a:visited { color: #364c88; }
+th.lineBlue a:hover, a:active {  }
+
+table.maintable { width: 100%; }
+table.maintable th { border-bottom: 1px solid #bbbbbb; }
+table.maintable td { padding-left: 2px; }
+table.maintable tr.tr0 { background-color: #ffffff; }
+table.maintable tr.tr1 { background-color: #f2f2f2; }
+table.maintable tr.tr3 { background-color: #ffffff; }
+table.maintable tr.tr3 td { border-top: 1px solid #bbbbbb; }
+
+table.maintable2 { width: 100%; }
+table.maintable2 th { border-bottom: 1px solid #bbbbbb; }
+table.maintable2 td { padding-left: 2px; }
+table.maintable2 tr.tr0 { background-color: #ffffff; }
+table.maintable2 tr.tr1 { background-color: #f2f2f2; }
+table.maintable2 tr.tr3 { background-color: #ffffff; }
+table.maintable2 tr.tr3 td { border-top: 1px solid #bbbbbb; }
+
+table.maintable2 a:link, a:active { color: #da2229; }
+table.maintable2 a:hover { color: #364c88; }
+
+#navcontainer {
+	margin: 0px;
+	margin-left: 26px;
+	padding: 0;
+}
+
+#navcontainer ul {
+	border: 0px;
+	margin: 0px;
+	padding: 0px;
+	list-style-type: none;
+	text-align: left;
+}
+#navcontainer ul li {
+	display: block;
+	float: left;
+	text-align: center;
+	padding: 0;
+	margin: 0;
+}
+#navcontainer ul li a, #navcontainer ul li.act a {
+	background: #545454;
+	width: 100px;
+	border-top: 0px;
+	padding: 2px;
+	margin: 0px;
+	color: #FFFFFF;
+	text-decoration: none;
+	display: block;
+	text-align: center;
+	font: bold 12px Tahoma;
+}
+#navcontainer ul li.act a {
+	background-color: #333333;
+}
+#navcontainer ul li a:hover {
+	color: #FFFFFF;
+	background: #333333;
+	text-decoration: underline;
+}
