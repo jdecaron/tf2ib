@@ -1,6 +1,6 @@
 COPY servers (dns, ip, last, port, botid) FROM stdin;
-chi1tf2pug.game.nfoservers.com  74.91.113.91    0   27015   0
-chi2tf2pug.game.nfoservers.com  74.91.115.215   0   27015   0
+chi1tf2pug.game.nfoservers.com	74.91.113.91	0	27015	0
+chi2tf2pug.game.nfoservers.com	74.91.115.215	0	27015	0
 \.
 
 COPY stats (class, nick, result, "time", botid) FROM stdin;
