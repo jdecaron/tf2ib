@@ -435,6 +435,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!stats', escapedUserCommand):
         stats(userName, userCommand)
         return 0
+    if re.search('^\\\\!status', escapedUserCommand):
+        thread.start_new_thread(status, ())
+        return 0
     if re.search('^\\\\!sub', escapedUserCommand):
         sub(userName, userCommand)
         return 0
@@ -1238,7 +1241,7 @@ def protect(userName, userCommand):
     authorize(userName, userCommand, 2)
 
 def prototype():
-    print userList
+    print "prototype"
 
 def replace(userName, userCommand):
     global userList
@@ -1483,6 +1486,31 @@ def stats(userName, userCommand):
     print commandList[1] + ' played a total of ' + str(winStats[4]) + ' game(s), has a win ratio of ' + str(winRatio) +'% and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.'
     send("PRIVMSG " + config.channel + ' :\x030,01' + commandList[1] + ' played a total of ' + str(winStats[4]) + ' game(s) and has a medic ratio of ' + color + str(medicRatio) + '%\x030,01.' + authorizationStatus)
 
+def status():
+    for server in getServerList():
+        try:
+            TF2Server = SRCDS.SRCDS(server['ip'], int(server['port']), config.rconPassword, 10)
+            serverInfo = {'map':'', 'playerCount':''}
+            serverStatus = TF2Server.rcon_command('status')
+            serverStatus = re.sub(' +', ' ', serverStatus)
+            tournamentInfo = TF2Server.rcon_command('tournament_info')
+            for s in serverStatus.strip().split("\n"):
+                if re.search("^players", s):
+                    serverInfo['playerCount'] = s.split(" ")[2]
+                if re.search("^map", s):
+                    serverInfo['map'] = s.split(" ")[2]
+            #if 3 <= int(serverInfo['playerCount']):
+            if 1:
+                if re.search("^Tournament is not live", tournamentInfo):
+                    send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": warmup on " + serverInfo['map'] + " with " + serverInfo['playerCount'] + " players")
+                else:
+                    tournamentInfo = tournamentInfo.split("\"")
+                    send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": \x0311,01" + tournamentInfo[3].split(":")[0] + "\x030,01:\x034,01" + tournamentInfo[3].split(":")[1] + "\x030,01 on " + serverInfo['map'] + " with " + tournamentInfo[1] + " remaining")
+            else:
+                send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": empty")
+        except:
+            send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": error processing the status info")
+
 def sub(userName, userCommand):
     global subList
     commandList = string.split(userCommand)
@@ -1590,7 +1618,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
