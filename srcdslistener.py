@@ -11,7 +11,7 @@ cursor = database.cursor()
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.bind(('69.164.199.15', 50007))
 listener.listen(1)
-servers = ["72.14.177.61", "69.164.197.215"]
+servers = ["216.52.148.224", "74.91.113.91", "74.91.115.215"]
 while 1:
     try:
         connection, address = listener.accept()
