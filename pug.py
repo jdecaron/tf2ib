@@ -1108,6 +1108,8 @@ def pick(userName, userCommand):
         if assignToCaptain:
             clearCaptainsFromTeam(getPlayerTeam(userName))
             userList[commandList[0]]['status'] = 'captain'
+        send("NOTICE " + commandList[0] + " : " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " picked you as " + gameClass) 
+        send("NOTICE " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " : \x037" + userName + " picked " + commandList[0] + " as " + gameClass) 
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
         if captainStage < (len(captainStageList) - 1):
             captainStage += 1
@@ -1499,8 +1501,7 @@ def status():
                     serverInfo['playerCount'] = s.split(" ")[2]
                 if re.search("^map", s):
                     serverInfo['map'] = s.split(" ")[2]
-            #if 3 <= int(serverInfo['playerCount']):
-            if 1:
+            if 3 <= int(serverInfo['playerCount']):
                 if re.search("^Tournament is not live", tournamentInfo):
                     send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": warmup on " + serverInfo['map'] + " with " + serverInfo['playerCount'] + " players")
                 else:
@@ -1584,7 +1585,7 @@ def welcome(connection, event):
 nick = 'PUG-BOT'
 name = 'BOT'
 
-adminCommands = ["\\!addgame", "\\!authorize", "\\!automatic", "\\!endgame", "\\!force", "\\!invite", "\\!manual", "\\!needsub", "\\!prototype", "\\!replace", "\\!restart", "\\!restrict"]
+adminCommands = ["\\!addgame", "\\!authorize", "\\!automatic", "\\!endgame", "\\!force", "\\!invite", "\\!manual", "\\!prototype", "\\!replace", "\\!restart", "\\!restrict"]
 adminList = {}
 allowFriends = 1
 awayList = {}
@@ -1618,7 +1619,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
