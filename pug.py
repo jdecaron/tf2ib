@@ -53,7 +53,7 @@ def add(userName, userCommand, ninjAdd = 0):
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
-                if classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 3:
+                if classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 4:
                     return 0
                 if state == 'captain' and countCaptains() < 2:
                     send("PRIVMSG " + config.channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
@@ -1585,7 +1585,7 @@ def updateUserStatus(nick, escapedUserCommand):
             userList[nick]['last'] = time.time()
         if nick in awayList:
             del awayList[nick]
-        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 3):
+        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 4):
             return 0
         if len(userList) >= numberOfPlayers and len(awayList) == 0 and classCount('medic') >= numberOfMedics:
             initGame()
