@@ -571,8 +571,16 @@ def getAvailableClasses():
 
 def getAvailableServer():
     for server in getServerList():
-        if server['last'] >= 0 and (time.time() - server['last']) >= (60 * 75):
-            return {'ip':server['dns'], 'port':server['port']}
+        try:
+            serverInfo = getServerInfo(server)
+            for s in serverInfo['serverStatus'].strip().split("\n"):
+                if re.search("^players", s):
+                    serverInfo['playerCount'] = s.split(" ")[2]
+            if 3 > int(serverInfo['playerCount']) and not re.search("^Tournament is not live", serverInfo['tournamentInfo']):
+                print {'ip':server['dns'], 'port':server['port']}
+                return {'ip':server['dns'], 'port':server['port']}
+        except:
+            print server['dns'] + ": error processing the server info"
     return 0
 
 def getCaptainNameFromTeam(team):
@@ -713,6 +721,16 @@ def getRemainingClasses():
     for gameClass in remainingClasses:
         uniqueRemainingClasses[gameClass] = gameClass
     return uniqueRemainingClasses
+
+def getServerInfo(server):
+    try:
+        TF2Server = SRCDS.SRCDS(server['ip'], int(server['port']), config.rconPassword, 10)
+        serverStatus = TF2Server.rcon_command('status')
+        serverStatus = re.sub(' +', ' ', serverStatus)
+        tournamentInfo = TF2Server.rcon_command('tournament_info')
+        return {'map':'', 'playerCount':'', 'serverStatus':serverStatus, 'tournamentInfo':tournamentInfo}
+    except:
+        return {'map':'', 'playerCount':'', 'serverInfo':0, 'serverStatus':0, 'tournamentInfo':0}
 
 def getServerList():
     serverList = []
@@ -1491,22 +1509,18 @@ def stats(userName, userCommand):
 def status():
     for server in getServerList():
         try:
-            TF2Server = SRCDS.SRCDS(server['ip'], int(server['port']), config.rconPassword, 10)
-            serverInfo = {'map':'', 'playerCount':''}
-            serverStatus = TF2Server.rcon_command('status')
-            serverStatus = re.sub(' +', ' ', serverStatus)
-            tournamentInfo = TF2Server.rcon_command('tournament_info')
-            for s in serverStatus.strip().split("\n"):
+            serverInfo = getServerInfo(server)
+            for s in serverInfo['serverStatus'].strip().split("\n"):
                 if re.search("^players", s):
                     serverInfo['playerCount'] = s.split(" ")[2]
                 if re.search("^map", s):
                     serverInfo['map'] = s.split(" ")[2]
             if 3 <= int(serverInfo['playerCount']):
-                if re.search("^Tournament is not live", tournamentInfo):
+                if re.search("^Tournament is not live", serverInfo['tournamentInfo']):
                     send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": warmup on " + serverInfo['map'] + " with " + serverInfo['playerCount'] + " players")
                 else:
-                    tournamentInfo = tournamentInfo.split("\"")
-                    send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": \x0311,01" + tournamentInfo[3].split(":")[0] + "\x030,01:\x034,01" + tournamentInfo[3].split(":")[1] + "\x030,01 on " + serverInfo['map'] + " with " + tournamentInfo[1] + " remaining")
+                    serverInfo['tournamentInfo'] = serverInfo['tournamentInfo'].split("\"")
+                    send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": \x0311,01" + serverInfo['tournamentInfo'][3].split(":")[0] + "\x030,01:\x034,01" + serverInfo['tournamentInfo'][3].split(":")[1] + "\x030,01 on " + serverInfo['map'] + " with " + serverInfo['tournamentInfo'][1] + " remaining")
             else:
                 send("PRIVMSG " + config.channel + " :\x030,01 " + server['dns'] + ": empty")
         except:
