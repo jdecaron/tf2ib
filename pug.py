@@ -396,6 +396,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!mumble', escapedUserCommand):
         mumble()
         return 0
+    if re.search('^\\\\!need$', escapedUserCommand) or re.search('^\\\\!need\\\\ ', escapedUserCommand):
+        need(userName, userCommand)
+        return 0
     if re.search('^\\\\!needsub', escapedUserCommand):
         needsub(userName, userCommand)
         return 0
@@ -1002,6 +1005,29 @@ def mumble():
     global voiceServer
     message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://downloads.sourceforge.net/project/mumble/Mumble/1.2.2/Mumble-1.2.2.exe"
     send("PRIVMSG " + config.channel + " :" + message)
+
+def need(userName, params):
+    """display players needed"""
+    neededClasses = {}
+    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+    neededPlayers = 0
+    captainsNeeded = 0
+    for gameClass in classList:
+        if classCount(gameClass) < numberOfPlayersPerClass[gameClass]:
+            needed = numberOfPlayersPerClass[gameClass] - classCount(gameClass)
+            neededClasses[gameClass] = needed
+            neededPlayers = neededPlayers + needed
+
+    if state == 'captain' and countCaptains() < 2:
+        captainsNeeded = 2 - countCaptains()
+
+    if neededPlayers == 0 and captainsNeeded == 0:
+        send("PRIVMSG %s :\x030,01no players needed." % (config.channel,))
+    else:
+        msg = ", ".join(['%s: %s' % (key, value) for (key, value) in neededClasses.items()])
+        if state == 'captain' and countCaptains() < 2:
+            msg = msg + ", captain: %d" % (captainsNeeded,)
+        send("PRIVMSG %s :\x030,01%d player(s) needed: %s" % (config.channel, neededPlayers, msg))
 
 def needsub(userName, userCommand):
     global classList, subList
@@ -1633,7 +1659,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
