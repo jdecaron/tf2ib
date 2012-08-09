@@ -24,10 +24,10 @@ def add(userName, userCommand, ninjAdd = 0):
         print medicStats
         """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-            return 0"""
+            return 0
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access to add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
-            return 0
+            return 0"""
         if state == 'captain' or state == 'highlander' or state == 'normal':
             remove(userName, 0)
             if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
@@ -579,7 +579,7 @@ def getAvailableServer():
             for s in serverInfo['serverStatus'].strip().split("\n"):
                 if re.search("^players", s):
                     serverInfo['playerCount'] = s.split(" ")[2]
-            if 3 > int(serverInfo['playerCount']) and not re.search("^Tournament is not live", serverInfo['tournamentInfo']):
+            if 3 > int(serverInfo['playerCount']) and re.search("^Tournament is not live", serverInfo['tournamentInfo']) and (time.time() - server['last']) >= (60 * 15):
                 print {'ip':server['dns'], 'port':server['port']}
                 return {'ip':server['dns'], 'port':server['port']}
         except:
@@ -1152,8 +1152,8 @@ def pick(userName, userCommand):
         if assignToCaptain:
             clearCaptainsFromTeam(getPlayerTeam(userName))
             userList[commandList[0]]['status'] = 'captain'
-        send("NOTICE " + commandList[0] + " : " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " picked you as " + gameClass) 
-        send("NOTICE " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " : \x037" + userName + " picked " + commandList[0] + " as " + gameClass) 
+        send("NOTICE " + commandList[0] + " : " + getCaptainNameFromTeam(getPlayerTeam(userName)) + " picked you as " + gameClass)
+        send("NOTICE " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " : " + userName + " picked " + commandList[0] + " as " + gameClass) 
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
         if captainStage < (len(captainStageList) - 1):
             captainStage += 1
@@ -1288,6 +1288,7 @@ def protect(userName, userCommand):
 
 def prototype():
     print "prototype"
+    getAvailableServer()
 
 def replace(userName, userCommand):
     global userList
@@ -1622,7 +1623,7 @@ def welcome(connection, event):
     server.join(config.channel)
 
 # Connection information
-nick = 'PUG-BOT'
+nick = 'PUGBOT'
 name = 'BOT'
 
 adminCommands = ["\\!addgame", "\\!authorize", "\\!automatic", "\\!endgame", "\\!force", "\\!invite", "\\!manual", "\\!prototype", "\\!replace", "\\!restart", "\\!restrict"]
