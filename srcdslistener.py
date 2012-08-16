@@ -1,11 +1,11 @@
 #!/usr/bin/python
 
 import config
-import psycopg
+import psycopg2
 import socket
 import time
 
-database = psycopg.connect('dbname=tf2ib host=localhost user=tf2ib password=' + databasePassword)
+database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + databasePassword)
 cursor = database.cursor()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
