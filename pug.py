@@ -894,6 +894,7 @@ def initGame():
         send("PRIVMSG " + config.channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
         send("PRIVMSG " + config.channel + " :\x037,01If you find teams unfair you can type \"!scramble\" and they will be adjusted.")
         state = 'building'
+        sendScramblingInvitation()
         initTimer = threading.Timer(20, buildTeams)
         initTimer.start()
         startGameTimer = threading.Timer(100, startGame)
@@ -1444,6 +1445,12 @@ def sendMessageToAwayPlayers():
     send("PRIVMSG " + config.channel + " :\x038,01Warning!\x030,01 " + words[0] + " considered as inactive by the bot : " + ", ".join(nickList) + ". If " + words[1] +" show any activity in the next minute " + words[2] + " will automatically be removed from the player list.")
     for user in awayList:
         send("PRIVMSG " + user + ' :Warning, you are considered as inactive by the bot and a game you subscribed is starting. If you still want to play this game you have to type anything in the channel, suggestion "\x034!ready\x031". If you don\'t want to play anymore you can remove by typing "!remove". Notice that after 60 seconds you will be automatically removed.')
+
+def sendScramblingInvitation():
+    userListCopy = userList.copy()
+    for user in userListCopy:
+        print user
+        send("PRIVMSG " + user + " :Teams are being drafted and you will be part of this next PUG, go in " + config.channel + " and look at the current teams, please scramble them if they look unfair.")
 
 def sendStartPrivateMessages():
     color = ['\x0312', '\x034']
