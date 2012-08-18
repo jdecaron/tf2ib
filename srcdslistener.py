@@ -5,7 +5,7 @@ import psycopg2
 import socket
 import time
 
-database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + databasePassword)
+database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + config.databasePassword)
 cursor = database.cursor()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
