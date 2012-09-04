@@ -1396,24 +1396,34 @@ def saveToLogs(data):
         logFile.close()
 
 def scramble(userName, force = 0):
-    global scrambleList, teamA, teamB, userList
+    global scrambleList, startGameTimer, teamA, teamB, userList
     if len(teamA) == 0:
         send("NOTICE " + userName + " :Wait until the teams are drafted to use this command.")
         return 0
     if not startGameTimer.isAlive():
         send("NOTICE " + userName + " :You have a maximum of 1 minute after the teams got originally drafted to use this command.")
         return 0
-    if (len(scrambleList) == 2 and userName not in scrambleList) or force:
+    found = 0
+    pastGameIndex = len(pastGames) - 1
+    for i in pastGames[pastGameIndex]['players']:
+        if i['nick'] == userName:
+            found = 1
+    if (len(scrambleList) >= 3 and userName not in scrambleList and found) or force:
+        """if int(time.time()) - initTime >= 70:
+            print "moretime"
+            startGameTimer.cancel()
+            startGameTimer = threading.Timer(30, startGame)
+            startGameTimer.start()"""
         scrambleList = []
         teamA = []
         teamB = []
-        pastGameIndex = len(pastGames) - 1
         for i in pastGames[pastGameIndex]['players']:
             userList[i['nick']] = i
         buildTeams()
         send("PRIVMSG " + config.channel + " :\x037,01Teams got scrambled.")
-    elif userName not in scrambleList:
+    elif userName not in scrambleList and found:
         scrambleList.append(userName)
+    print scrambleList
 
 def send(message, delay = 0):
     global connection
