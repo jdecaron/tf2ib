@@ -18,7 +18,7 @@ def connect():
     server.connect(config.network, config.port, nick, ircname = name)
 
 def welcome(connection, event):
-    server.join("#tf2.pug.na")
+    server.join("#tf2mix")
 
 nick = ''
 ip = ''

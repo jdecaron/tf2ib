@@ -1,17 +1,17 @@
 #!/usr/bin/python
 
 import config
-import psycopg
+import psycopg2
 import socket
 import time
 
-database = psycopg.connect('dbname=tf2ib host=localhost user=tf2ib password=' + databasePassword)
+database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' + config.databasePassword)
 cursor = database.cursor()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listener.bind(('69.164.199.15', 50007))
+listener.bind(('173.255.206.107', 27069))
 listener.listen(1)
-servers = ["216.52.148.224", "74.91.113.91", "74.91.115.215"]
+servers = ["208.115.210.90", "208.115.210.91", "208.115.210.92", "208.115.210.93", "208.115.210.94"]
 while 1:
     try:
         connection, address = listener.accept()
