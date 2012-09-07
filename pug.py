@@ -913,6 +913,7 @@ def initGame():
         initTimer = threading.Timer(60, assignCaptains, ['scrim'])
         initTimer.start()
         players(nick)
+    restartServer()
 
 def initServer():
     global gameServer, lastGame
@@ -1340,7 +1341,6 @@ def remove(userName, printUsers = 1):
         if printUsers:
             printUserList()
 
-
 def removeAwayUsers():
     global awayList, awayTimer
     for user in awayList:
@@ -1373,6 +1373,13 @@ def resetVariables():
 def restartBot():
     global restart
     restart = 1
+
+def restartServer():
+    try:
+        TF2Server = SRCDS.SRCDS(string.split(gameServer, ':')[0], int(string.split(gameServer, ':')[1]), config.rconPassword, 10)
+        TF2Server.rcon_command('_restart')
+    except:
+        return 0
 
 def restrict(userName, userCommand):
     authorize(userName, userCommand, 0)
