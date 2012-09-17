@@ -12,12 +12,14 @@ def checkConnection():
     global connectTimer
     if not server.is_connected():
         connect()
+    server.join('#tf2scrim')
     server.join(config.channel)
 
 def connect():
     server.connect(config.network, config.port, nick, ircname = name)
 
 def welcome(connection, event):
+    server.join('#tf2scrim')
     server.join(config.channel)
 
 nick = ''

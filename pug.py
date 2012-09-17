@@ -322,7 +322,7 @@ def createUser(userName, userCommand, userAuthorizationLevel):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        if 'medic' not in user['class'] and getWinStats(userName)[1] < 20:
+        if 'medic' not in user['class'] and getWinStats(userName)[1] <= 0:
             send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played.")
         else:
             user['status'] = 'captain'
@@ -583,7 +583,8 @@ def getAvailableServer():
                 print {'ip':server['dns'], 'port':server['port']}
                 return {'ip':server['dns'], 'port':server['port']}
         except:
-            print server['dns'] + ": error processing the server info"
+            print server
+            print "Error processing the server info"
     return 0
 
 def getCaptainNameFromTeam(team):
@@ -800,6 +801,7 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
+    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
@@ -1685,7 +1687,7 @@ scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
-userLimit = 12
+userLimit = 24
 userList = {}
 voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
 
