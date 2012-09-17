@@ -322,7 +322,7 @@ def createUser(userName, userCommand, userAuthorizationLevel):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        if 'medic' not in user['class'] and getWinStats(userName)[1] <= 0:
+        if 'medic' not in user['class'] and getWinStats(userName)[1] < 0:
             send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played.")
         else:
             user['status'] = 'captain'
@@ -583,8 +583,7 @@ def getAvailableServer():
                 print {'ip':server['dns'], 'port':server['port']}
                 return {'ip':server['dns'], 'port':server['port']}
         except:
-            print server
-            print "Error processing the server info"
+            print server['dns'] + ": error processing the server info"
     return 0
 
 def getCaptainNameFromTeam(team):
@@ -785,7 +784,7 @@ def getWinStats(userName):
     return [userName, 0, 0, 0, 0]
 
 def help():
-    send("PRIVMSG " + config.channel + " :\x030,01Visit \x0311,01http://communityfortress.com/tf2/news/tf2pugna-released.php\x030,01 to get help about the PUG process.")
+    send("PRIVMSG " + config.channel + " :\x030,01Visit \x0311,01http://teamfortress.tv/forum/thread/712/1#post-7462\x030,01 to get help about the PUG process.")
 
 def invite(userName, userCommand):
     authorize(userName, userCommand, 3)
@@ -795,13 +794,12 @@ def ip(userName, userCommand):
     commandList = string.split(userCommand, ' ')
     if len(commandList) < 2:
         if gameServer != '':
-            message = "\x030,01Server IP : \"connect " + gameServer + "; password " + password + ";\". Servers are provided by Command Channel : \x0307,01https://commandchannel.com/"
+            message = "\x030,01Server IP : \"connect " + gameServer + "; password " + password + ";\". We are using our own servers but we like these guys at : \x0307,01http://tragicservers.com/"
             send("PRIVMSG " + config.channel + " :" + message)
         return 0
     setIP(userName, userCommand)
 
 def isAdmin(userName):
-    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
@@ -1469,7 +1467,7 @@ def sendStartPrivateMessages():
     for teamID in ['a', 'b']:
         team = getTeam(teamID)
         for user in team:
-            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug.na\". \x0307SteamLinker : \x03tf://" + gameServer + "/" + password)
+            send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2mix\". \x0307SteamLinker : \x03tf://" + gameServer + "/" + password)
             userCounter += 1
         teamCounter += 1
 
@@ -1590,7 +1588,7 @@ def sub(userName, userCommand):
         send("NOTICE " + userName + " :You must supply a valid substitute ID. Example : \"!sub 1\".")
         return 0
     subIndex = getSubIndex(id)
-    send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2.pug\".")
+    send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2mix\".")
     del(subList[subIndex])
     return 0
 
@@ -1687,9 +1685,9 @@ scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
-userLimit = 24
+userLimit = 12
 userList = {}
-voiceServer = {'ip':'tf2pug.commandchannel.com', 'port':'31472'}
+voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
 
 connection = psycopg2.connect('dbname=tf2ib host=127.0.0.1 user=tf2ib password=' + config.databasePassword)
 
