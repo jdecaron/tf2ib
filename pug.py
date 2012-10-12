@@ -784,7 +784,7 @@ def getWinStats(userName):
     return [userName, 0, 0, 0, 0]
 
 def help():
-    send("PRIVMSG " + config.channel + " :\x030,01Visit \x0311,01http://teamfortress.tv/forum/thread/712/1#post-7462\x030,01 to get help about the PUG process.")
+    send("PRIVMSG " + config.channel + " :\x030,01Visit \x0311,01http://steamcommunity.com/groups/tf2mix/discussions/0/882961586767057144/\x030,01 to get help about the PUG process.")
 
 def invite(userName, userCommand):
     authorize(userName, userCommand, 3)
@@ -1261,7 +1261,7 @@ def printTeamsHandicaps():
             winRatioOverall[teamIndex] = 0
         else:
             winRatioOverall[teamIndex] = 100 * (float(handicapTotal[teamIndex] + gamesPlayedCounter[teamIndex]) / float(2 * gamesPlayedCounter[teamIndex]))
-    print "Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%"
+    send("PRIVMSG " + config.channel + " :" + "Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList

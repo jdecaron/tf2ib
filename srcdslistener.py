@@ -9,9 +9,9 @@ database = psycopg2.connect('dbname=tf2ib host=localhost user=tf2ib password=' +
 cursor = database.cursor()
 
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listener.bind(('69.164.199.15', 50007))
+listener.bind(('173.255.206.107', 27069))
 listener.listen(1)
-servers = ["216.52.148.224", "74.91.113.91", "74.91.115.215"]
+servers = ["173.236.129.73", "208.115.210.90", "208.115.210.91", "208.115.210.92", "208.115.210.93", "208.115.210.94"]
 while 1:
     try:
         connection, address = listener.accept()
@@ -26,6 +26,11 @@ while 1:
     print address[0] 
     if data and address[0] in servers:
         print 'authorized'
-        cursor.execute('INSERT INTO srcds VALUES (%s, %s)', (data, int(time.time())))
-        database.commit()
+        if address[0] == "173.236.129.73":
+            message = "PRIVMSG " + config.channel + " :\x038,01Statistics have been updated: \x0311,01" + data
+            cursor.execute('INSERT INTO messages (message) VALUES (%s)', (message,))
+            cursor.execute('COMMIT;')
+        else:
+            cursor.execute('INSERT INTO srcds VALUES (%s, %s)', (data, int(time.time())))
+            database.commit()
         connection.close()

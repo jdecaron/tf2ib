@@ -42,9 +42,9 @@ def book(userName, userCommand):
         bookedServers[server['ip']] = [bookedTo, time.time(), serverPassword, server['ip']]
         updateLast(server['ip'], '27015', time.time())
         send("PRIVMSG " + channel + " :\x030,01Server " + server['ip'] + " has been reserverd to " + bookedTo +  ". Servers are provided by cinq: \x0307,01http://atf2.org/")
-        send("PRIVMSG " + userName + " :The information to connect to the server is \"connect " + server['ip'] + ".atf2.org:27015; password " + serverPassword + "\". The server is being restarted, the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
+        send("PRIVMSG " + userName + " :The information to connect to the server is \"connect " + server['ip'] + ":27015; password " + serverPassword + "\". The server is being restarted, the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
         if bookedTo.lower() != userName.lower():
-            send("PRIVMSG " + bookedTo + " : A server has been booked for you and you have 60 minutes to use it. The information to connect to the server is \"connect " + server['ip'] + ".atf2.org:27015; password " + serverPassword + "\". The server is being restarted and the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
+            send("PRIVMSG " + bookedTo + " : A server has been booked for you and you have 60 minutes to use it. The information to connect to the server is \"connect " + server['ip'] + ":27015; password " + serverPassword + "\". The server is being restarted and the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
         executeRconCommand('_restart', server['ip'] + ':27015')
         printTimer = threading.Timer(30, executeRconCommand, ['sv_password ' + serverPassword, server['ip'] + ':27015'])
         printTimer.start()
@@ -330,7 +330,7 @@ def welcome(connection, event):
 
 # Connection information
 channel = '#tf2scrim'
-nick = 'BOOKBOT'
+nick = 'BOOK-BOT'
 name = 'BOT'
 
 adminCommands = ["\\!prototype"]
@@ -361,5 +361,5 @@ while not restart:
     for serverName in bookedServers.copy():
         if time.time() - bookedServers[serverName][1] > (60 * 60):
             if serverName in bookedServers:
-                updateLast(bookedServers[serverName][3] + '.atf2.org', '27015', 0)
+                updateLast(bookedServers[serverName][3], '27015', 0)
                 del bookedServers[serverName]

@@ -1,9 +1,9 @@
 #IRC
-channel = "#tf2.pug.na"
-network = "127.0.0.1"
+channel = "#tf2mix"
+network = "Gameservers.NJ.US.GameSurge.net"
 port = 6667
 
 #Passwords
-databasePassword = "jw8s0F4"
+databasePassword = "y8hdr517"
 gamesurgePassword = "password"
-rconPassword = "password"
+rconPassword = "sauce"
