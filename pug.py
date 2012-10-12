@@ -246,7 +246,7 @@ def buildTeams():
 
 def captain():
     global teamA, teamB
-    if len(teamA) > 0 and len(teamB) < 6:
+    if len(teamA) > 0 and len(teamA) < 6:
         for user in getTeam(captainStageList[captainStage]):
             if user['status'] == 'captain':
                 captainName = user['nick']
@@ -1154,8 +1154,10 @@ def pick(userName, userCommand):
         if assignToCaptain:
             clearCaptainsFromTeam(getPlayerTeam(userName))
             userList[commandList[0]]['status'] = 'captain'
-        send("NOTICE " + commandList[0] + " : " + getCaptainNameFromTeam(getPlayerTeam(userName)) + " picked you as " + gameClass)
-        send("NOTICE " + getCaptainNameFromTeam(getOppositeTeam(getPlayerTeam(userName))) + " : " + userName + " picked " + commandList[0] + " as " + gameClass) 
+        color = '\x0311,01'
+        if captainStageList[captainStage] == 'b':
+            color = '\x034,01'
+        send("PRIVMSG " + config.channel + " :" + color + userName + " \x030,01picked " + color + commandList[0] + "\x030,01 as " + gameClass)
         assignUserToTeam(gameClass, 0, getPlayerTeam(userName), userList[commandList[0]])
         if captainStage < (len(captainStageList) - 1):
             captainStage += 1
