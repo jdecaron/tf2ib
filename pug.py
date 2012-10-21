@@ -375,6 +375,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!game', escapedUserCommand):
         game(userName, userCommand)
         return 0
+    if re.search('^\\\\!help$', escapedUserCommand):
+        help()
+        return 0
     if re.search('^\\\\!invite', escapedUserCommand):
         invite(userName, userCommand)
         return 0
@@ -386,6 +389,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!limit', escapedUserCommand):
         limit(userName, userCommand)
+        return 0
+    if re.search('^\\\\!map$', escapedUserCommand):
+        map()
         return 0
     if re.search('^\\\\!man$', escapedUserCommand):
         help()
@@ -892,7 +898,7 @@ def initGame():
     if state == "normal" or state == "highlander":
         scrambleList = []
         send("PRIVMSG " + config.channel + " :\x038,01Teams are being drafted, please wait in the channel until this process is over.")
-        send("PRIVMSG " + config.channel + " :\x037,01If you find teams unfair you can type \"!scramble\" and they will be adjusted.")
+        send("PRIVMSG " + config.channel + " :\x037,01If you find teams unfair you can type \"!scramble\" and they will be adjusted (3 votes needed).")
         state = 'building'
         sendScramblingInvitation()
         initTimer = threading.Timer(20, buildTeams)
@@ -1003,10 +1009,12 @@ def listeningTF2Servers():
                 cursor.execute('DELETE FROM srcds WHERE time = %s', (queryData[i][1],))
                 cursor.execute('COMMIT;')
 
+def map():
+    send("PRIVMSG " + config.channel + " :\x030,01You can RTV and nominate once you are connected to the servers.")
+
 def mumble():
-    global voiceServer
-    message = "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'] + "  Password : " + password + "  Download : http://downloads.sourceforge.net/project/mumble/Mumble/1.2.2/Mumble-1.2.2.exe"
-    send("PRIVMSG " + config.channel + " :" + message)
+    send("PRIVMSG " + config.channel + " :" + "\x030,01Voice server IP : " + voiceServer['ip'] + ":" + voiceServer['port'])
+    send("PRIVMSG " + config.channel + " :" + "\x030,01Link to download Mumble : http://sourceforge.net/projects/mumble/files/Mumble/1.2.3a/mumble-1.2.3a.msi")
 
 def need(userName, params):
     """display players needed"""
@@ -1261,7 +1269,7 @@ def printTeamsHandicaps():
             winRatioOverall[teamIndex] = 0
         else:
             winRatioOverall[teamIndex] = 100 * (float(handicapTotal[teamIndex] + gamesPlayedCounter[teamIndex]) / float(2 * gamesPlayedCounter[teamIndex]))
-    send("PRIVMSG " + config.channel + " :" + "Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%")
+    #send("PRIVMSG " + config.channel + " :" + "\x030,01Teams wins ratios : \x0311,01" + str(int(winRatioOverall[0])) + "%\x030,01 / \x034,01" + str(int(winRatioOverall[1])) + "%")
 
 def printUserList():
     global lastUserPrint, printTimer, state, userList
@@ -1416,7 +1424,7 @@ def scramble(userName, force = 0):
     for i in pastGames[pastGameIndex]['players']:
         if i['nick'] == userName:
             found = 1
-    if (len(scrambleList) >= 3 and userName not in scrambleList and found) or force:
+    if (len(scrambleList) >= 2 and userName not in scrambleList and found) or force:
         """if int(time.time()) - initTime >= 70:
             print "moretime"
             startGameTimer.cancel()
@@ -1669,7 +1677,7 @@ lastGame = 0
 lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_gullywash_final1", "cp_snakewater", "cp_granary"]
+mapList = ["cp_badlands", "cp_gullywash_final1", "cp_snakewater", "cp_granary", "cp_process_b10"]
 maximumUserLimit = 24
 minuteTimer = time.time()
 nominatedCaptains = []
@@ -1684,7 +1692,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!map", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
