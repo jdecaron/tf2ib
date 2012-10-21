@@ -50,6 +50,8 @@ function parse ($directory, $ready_word) {
 	$ready = 0;
 	$ready_red = 0;
 	$ready_blue = 0;
+    $blue_score = 0;
+    $red_score = 0;
 	$clanbattle = 1;
 	if (!strcmp($ready_word,'')) {
 		$ready = 1;
@@ -334,7 +336,6 @@ function parse ($directory, $ready_word) {
 			// triggered "builtobject" (object "OBJ_SENTRYGUN") (position "-2322 -807 -255")
 			// -----------------------------------------------------------------
 			else if (preg_match('/^triggered/',$action,$m)) {
-
 				$action = preg_replace("/\s*\(\w+position \".*?\"\)/",'',$action);
 
 				if (preg_match('/^triggered "(.+?)"\s?(.*?)\s*$/',$action,$m)) {}
@@ -369,26 +370,6 @@ function parse ($directory, $ready_word) {
 				}
 
 				// -------------------------------------------------------------
-				// killedobject
-				// -------------------------------------------------------------
-				else if ($trigger == 'killedobject') {
-					if (preg_match('/^\(object "(.+?)"\) \(weapon "(.+?)"\) \(objectowner ".+?<\d+><STEAM_\d:\d:\d+><\w+>"\)/',$details,$m)) {
-						$object = $m[1];
-						$weapon = $m[2];
-
-						// Find the current role and update role array
-						$role = weapon_to_role($weapon);
-						if ($role) { $p[$id]['role']['last'] = $role; }
-
-						// Add to player's array
-						$p[$id]['roles'][$p[$id]['role']['last']]['killedobjects']++;
-						$p[$id]['roles']['all']['killedobjects']++;
-						$p[$id]['weapons'][$weapon]['killedobjects']++;
-						$p[$id]['weapons']['all']['killedobjects']++;
-					}
-				}
-
-				// -------------------------------------------------------------
 				// captureblocked
 				// -------------------------------------------------------------
 				else if ($trigger == 'captureblocked') {
@@ -396,12 +377,21 @@ function parse ($directory, $ready_word) {
 					$p[$id]['roles']['all']['capturesblocked']++;
 				}
 
-				// -------------------------------------------------------------
-				// captureblocked
-				// -------------------------------------------------------------
 				else if ($trigger == 'damage') {
-					$p[$id]['roles'][$p[$id]['role']['last']]['damage']+= $details;
-					$p[$id]['roles']['all']['damage']+= $details;
+                    if(preg_match('/\d+/', $details, $m)){
+                        $p[$id]['roles'][$p[$id]['role']['last']]['damage']+= intval($m[0]);
+                        $p[$id]['roles']['all']['damage']+=intval($m[0]);
+                    }
+				}
+
+				else if ($trigger == 'healed') {
+                    if (preg_match('/<STEAM_(\d:\d:\d+)>.+?<STEAM_(\d:\d:\d+)>/',$event,$m)){
+                        $healed_id = $m[2];
+                        if (preg_match('/\(healing "(\d+)"\)$/', $event, $m)){
+                            $p[$healed_id]['roles'][$p[$healed_id]['role']['last']]['healed']+= intval($m[1]);
+                            $p[$healed_id]['roles']['all']['healed']+=intval($m[1]);
+                        }
+                    }
 				}
 
 				// -------------------------------------------------------------
@@ -516,6 +506,11 @@ function parse ($directory, $ready_word) {
 		// example: World triggered "Round_Win" (winner "Red")
 		// ---------------------------------------------------------------------
 		else if (preg_match('/^World triggered "Round_Win"/',$event,$m)) {
+            if(preg_match('/Blue/',$event,$m)){
+                $blue_score++;
+            }else{
+                $red_score++;
+            }
 			// Capture point resets
 			if (!is_array($c['list'])) { $c['list'] = array(); }
 			$char = 'a';
@@ -590,12 +585,13 @@ function parse ($directory, $ready_word) {
 		$totals[$p[$id]['team']['team']]['assists'] += $p[$id]['roles']['all']['assists'];
 		$totals[$p[$id]['team']['team']]['backstabs'] += $p[$id]['roles']['all']['backstabs'];
 		$totals[$p[$id]['team']['team']]['headshots'] += $p[$id]['roles']['all']['headshots'];
-		$totals[$p[$id]['team']['team']]['killedobjects'] += $p[$id]['roles']['all']['killedobjects'];
 		$totals[$p[$id]['team']['team']]['ubers'] += $p[$id]['roles']['all']['ubers'];
 		$totals[$p[$id]['team']['team']]['builtobjects'] += $p[$id]['roles']['all']['builtobjects'];
 		$totals[$p[$id]['team']['team']]['dominations'] += $p[$id]['roles']['all']['dominations'];
 		$totals[$p[$id]['team']['team']]['revenges'] += $p[$id]['roles']['all']['revenges'];
 		$totals[$p[$id]['team']['team']]['capturesblocked'] += $p[$id]['roles']['all']['capturesblocked'];
+		$totals[$p[$id]['team']['team']]['damage'] += $p[$id]['roles']['all']['damage'];
+		$totals[$p[$id]['team']['team']]['healed'] += $p[$id]['roles']['all']['healed'];
 		$totals[$p[$id]['team']['team']]['caps'] += $p[$id]['roles']['all']['caps'];
 	}
 
@@ -832,10 +828,10 @@ EOT;
 			<th>Kills</th>
 			<th>Assists</th>
 			<th>Deaths</th>
-			<th>Killed<br>Objs</th>
 			<th>Caps</th>
 			<th>Caps<br>Blkd</th>
 			<th>Damage</th>
+			<th>Healed</th>
 			<th>Ubers</th>
 			<th>Built</th>
 			<th>Dmntns</th>
@@ -897,10 +893,10 @@ EOT;
 					<td>{$p[$id]['roles'][$role]['kills']}</td>
 					<td>{$p[$id]['roles'][$role]['assists']}</td>
 					<td>{$p[$id]['roles'][$role]['deaths']}</td>
-					<td>{$p[$id]['roles'][$role]['killedobjects']}</td>
 					<td>{$p[$id]['roles'][$role]['caps']}</td>
 					<td>{$p[$id]['roles'][$role]['capturesblocked']}</td>
 					<td>{$p[$id]['roles'][$role]['damage']}</td>
+					<td>{$p[$id]['roles'][$role]['healed']}</td>
 					<td>{$p[$id]['roles'][$role]['ubers']}</td>
 					<td>{$p[$id]['roles'][$role]['builtobjects']}</td>
 					<td>{$p[$id]['roles'][$role]['dominations']}</td>
@@ -919,10 +915,10 @@ EOT;
 				<td>{$p[$id]['roles']['all']['kills']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['assists']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['deaths']}&nbsp;</th>
-				<td>{$p[$id]['roles']['all']['killedobjects']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['caps']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['capturesblocked']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['damage']}&nbsp;</th>
+				<td>{$p[$id]['roles']['all']['healed']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['ubers']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['builtobjects']}&nbsp;</th>
 				<td>{$p[$id]['roles']['all']['dominations']}&nbsp;</th>
@@ -1010,10 +1006,10 @@ EOT;
 			<th>Kills</th>
 			<th>Assists</th>
 			<th>Deaths</th>
-			<th>Killed<br>Objs</th>
 			<th>Caps</th>
 			<th>Caps<br>Blkd</th>
 			<th>Damage</th>
+			<th>Healed</th>
 			<th>Ubers</th>
 			<th>Built</th>
 			<th>Dmntns</th>
@@ -1022,15 +1018,17 @@ EOT;
 EOT;
 
 	if ($clanbattle) { $tmpstr = '- '; }
-	$blue = "<div class='breadcrumbs' style=\"font-size:15px;\">Download the demo file of this game : <a href='http://demos.tf2pug.org/{$tvFileName}.dem'>{$tvFileName}</a></div>";
-	$blue .= "<div class='contentheader'>Blue {$tmpstr}{$cmp['Blue']['clan']}</div><table class='maintable'>{$trh}";
-	$red = "<div class='contentheader2'>Red {$tmpstr}{$cmp['Red']['clan']}</div><table class='maintable2'>{$trh}";
+	$blue = "<div class='breadcrumbs' style=\"font-size:15px;\">Download the demo file of this game : <a href='http://demos.atf2.org/{$tvFileName}'>{$tvFileName}</a></div>";
+	$blue .= "<div class='contentheader'>Blue {$blue_score}</div><table class='maintable'>{$trh}";
+	$red = "<div class='contentheader2'>Red {$red_score}{$cmp['Red']['clan']}</div><table class='maintable2'>{$trh}";
 
 	// Loop through each player and seperate them into two teams
 	$tmpa['Red'] = 0;
 	$tmpa['Blue'] = 0;
 	foreach ($p as $id => $arr) {
 		$tmpa['mod'] = $tmpa[$p[$id]['team']['team']]++ % 2;
+        $p[$id]['roles']['all']['damage'] = number_format($p[$id]['roles']['all']['damage']);
+        $p[$id]['roles']['all']['healed'] = number_format($p[$id]['roles']['all']['healed']);
 		$tr = <<<EOT
 			<tr class="tr{$tmpa['mod']}">
 				<td>$id</th>
@@ -1040,22 +1038,26 @@ EOT;
 				<td>{$p[$id]['roles']['all']['kills']}</th>
 				<td>{$p[$id]['roles']['all']['assists']}</th>
 				<td>{$p[$id]['roles']['all']['deaths']}</th>
-				<td>{$p[$id]['roles']['all']['killedobjects']}</th>
 				<td>{$p[$id]['roles']['all']['caps']}</th>
 				<td>{$p[$id]['roles']['all']['capturesblocked']}</th>
 				<td>{$p[$id]['roles']['all']['damage']}</th>
+				<td>{$p[$id]['roles']['all']['healed']}</th>
 				<td>{$p[$id]['roles']['all']['ubers']}</th>
 				<td>{$p[$id]['roles']['all']['builtobjects']}</th>
 				<td>{$p[$id]['roles']['all']['dominations']}</th>
 				<td>{$p[$id]['roles']['all']['revenges']}</th>
 			</tr>
 EOT;
-		if (!strcmp($p[$id]['team']['team'],'Red')) { $red .= $tr; }
-		else if (!strcmp($p[$id]['team']['team'],'Blue')) { $blue .= $tr; }
+        if($p[$id]['roles'][$role]['points'] > 0){
+            if (!strcmp($p[$id]['team']['team'],'Red')) { $red .= $tr; }
+            else if (!strcmp($p[$id]['team']['team'],'Blue')) { $blue .= $tr; }
+        }
 	}
 
 	# Totals row
 	foreach ($totals as $tteam => $row) {
+        $row['damage'] = number_format($row['damage']);
+        $row['healed'] = number_format($row['healed']);
 		$ttr = <<<EOT
 			<tr class="tr3">
 				<td>&nbsp;</td>
@@ -1065,10 +1067,10 @@ EOT;
 				<td>{$row['kills']}&nbsp;</td>
 				<td>{$row['assists']}&nbsp;</td>
 				<td>{$row['deaths']}&nbsp;</td>
-				<td>{$row['killedobjects']}&nbsp;</td>
 				<td>{$row['caps']}&nbsp;</td>
 				<td>{$row['capturesblocked']}&nbsp;</td>
 				<td>{$row['damage']}&nbsp;</td>
+				<td>{$row['healed']}&nbsp;</td>
 				<td>{$row['ubers']}&nbsp;</td>
 				<td>{$row['builtobjects']}&nbsp;</td>
 				<td>{$row['dominations']}&nbsp;</td>
@@ -1234,11 +1236,18 @@ EOT;
                 $database->query("UPDATE statsIndex SET files = '$updatedFiles' WHERE id = '$index'");
             }
         }
-        if($runUpdate)
+        if($runUpdate){
             $database->query("INSERT INTO statsIndex VALUES ('$index', '$logName')");
+        }
     }
 
     $database->query("INSERT INTO files VALUES ('$logName', $fullDate)");
+
+    $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+    socket_connect($sock, 'atf2.org', 27069);
+    $request = 'http://stats.atf2.org/log/' . $logName;
+    socket_write($sock, $request);
+    socket_close($sock);
 
 	return 1;
 }
