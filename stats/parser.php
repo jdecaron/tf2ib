@@ -505,11 +505,12 @@ function parse ($directory, $ready_word) {
 		// World triggered Round_Win
 		// example: World triggered "Round_Win" (winner "Red")
 		// ---------------------------------------------------------------------
-		else if (preg_match('/^World triggered "Round_Win"/',$event,$m)) {
+		else if (preg_match('/^Team "\w+" current score "(\d+)"/',$event,$m)) {
+            $score = $m[1];
             if(preg_match('/Blue/',$event,$m)){
-                $blue_score++;
+                $blue_score = intval($score);
             }else{
-                $red_score++;
+                $red_score = intval($score);
             }
 			// Capture point resets
 			if (!is_array($c['list'])) { $c['list'] = array(); }
@@ -997,25 +998,7 @@ EOT;
 	// -------------------------------------------------------------------------
 	// First two tables, main blue and main red
 	// -------------------------------------------------------------------------
-	$trh = <<<EOT
-		<tr>
-			<th width=80px>SteamId</th>
-			<th width=150px>Name</th>
-			<th width=100px>Classes</th>
-			<th>Points</th>
-			<th>Kills</th>
-			<th>Assists</th>
-			<th>Deaths</th>
-			<th>Caps</th>
-			<th>Caps<br>Blkd</th>
-			<th>Damage</th>
-			<th>Healed</th>
-			<th>Ubers</th>
-			<th>Built</th>
-			<th>Dmntns</th>
-			<th>Rvngs</th>
-		</tr>
-EOT;
+	$trh = "<tr><th width=80px><a href='#' onclick='sort(this, 0)'>SteamID</a></th><th width=150px><a href='#' onclick='sort(this, 1)'>Name</a></th><th width=100px><a href='#' onclick='sort(this, 2)'>Classes</a></th><th><a href='#' onclick='sort(this, 3)'>Points</a></th><th><a href='#' onclick='sort(this, 4)'>Kills</a></th><th><a href='#' onclick='sort(this, 5)'>Assists</a></th><th><a href='#' onclick='sort(this, 6)'>Deaths</a></th><th><a href='#' onclick='sort(this, 7)'>Caps</a></th><th><a href='#' onclick='sort(this, 8)'>Caps<br>Blkd</a></th><th><a href='#' onclick='sort(this, 9)'>Damage</a></th><th><a href='#' onclick='sort(this, 10)'>Healed</a></th><th><a href='#' onclick='sort(this, 11)'>Ubers</a></th><th><a href='#' onclick='sort(this, 12)'>Builts</a></th><th><a href='#' onclick='sort(this, 13)'>Dmntns</a></th><th><a href='#' onclick='sort(this, 14)'>Rvngs</a></th></tr>";
 
 	if ($clanbattle) { $tmpstr = '- '; }
 	$blue = "<div class='breadcrumbs' style=\"font-size:15px;\">Download the demo file of this game : <a href='http://demos.atf2.org/{$tvFileName}'>{$tvFileName}</a></div>";
@@ -1029,25 +1012,7 @@ EOT;
 		$tmpa['mod'] = $tmpa[$p[$id]['team']['team']]++ % 2;
         $p[$id]['roles']['all']['damage'] = number_format($p[$id]['roles']['all']['damage']);
         $p[$id]['roles']['all']['healed'] = number_format($p[$id]['roles']['all']['healed']);
-		$tr = <<<EOT
-			<tr class="tr{$tmpa['mod']}">
-				<td>$id</th>
-				<td><a href="{$p[$id]['html']}.html">{$p[$id]['alias']}</a></th>
-				<td>{$p[$id]['role']['str']}</th>
-				<td>{$p[$id]['roles']['all']['points']}</th>
-				<td>{$p[$id]['roles']['all']['kills']}</th>
-				<td>{$p[$id]['roles']['all']['assists']}</th>
-				<td>{$p[$id]['roles']['all']['deaths']}</th>
-				<td>{$p[$id]['roles']['all']['caps']}</th>
-				<td>{$p[$id]['roles']['all']['capturesblocked']}</th>
-				<td>{$p[$id]['roles']['all']['damage']}</th>
-				<td>{$p[$id]['roles']['all']['healed']}</th>
-				<td>{$p[$id]['roles']['all']['ubers']}</th>
-				<td>{$p[$id]['roles']['all']['builtobjects']}</th>
-				<td>{$p[$id]['roles']['all']['dominations']}</th>
-				<td>{$p[$id]['roles']['all']['revenges']}</th>
-			</tr>
-EOT;
+		$tr = "<tr class=\"tr{$tmpa['mod']}\"><td>$id</th><td><a href=\"{$p[$id]['html']}.html\">{$p[$id]['alias']}</a></th><td>{$p[$id]['role']['str']}</th><td>{$p[$id]['roles']['all']['points']}</th><td>{$p[$id]['roles']['all']['kills']}</th><td>{$p[$id]['roles']['all']['assists']}</th><td>{$p[$id]['roles']['all']['deaths']}</th><td>{$p[$id]['roles']['all']['caps']}</th><td>{$p[$id]['roles']['all']['capturesblocked']}</th><td>{$p[$id]['roles']['all']['damage']}</th><td>{$p[$id]['roles']['all']['healed']}</th><td>{$p[$id]['roles']['all']['ubers']}</th><td>{$p[$id]['roles']['all']['builtobjects']}</th><td>{$p[$id]['roles']['all']['dominations']}</th><td>{$p[$id]['roles']['all']['revenges']}</th></tr>";
         if($p[$id]['roles'][$role]['points'] > 0){
             if (!strcmp($p[$id]['team']['team'],'Red')) { $red .= $tr; }
             else if (!strcmp($p[$id]['team']['team'],'Blue')) { $blue .= $tr; }
@@ -1058,25 +1023,7 @@ EOT;
 	foreach ($totals as $tteam => $row) {
         $row['damage'] = number_format($row['damage']);
         $row['healed'] = number_format($row['healed']);
-		$ttr = <<<EOT
-			<tr class="tr3">
-				<td>&nbsp;</td>
-				<td><b>Totals</b></td>
-				<td>&nbsp;</td>
-				<td>{$row['points']}&nbsp;</td>
-				<td>{$row['kills']}&nbsp;</td>
-				<td>{$row['assists']}&nbsp;</td>
-				<td>{$row['deaths']}&nbsp;</td>
-				<td>{$row['caps']}&nbsp;</td>
-				<td>{$row['capturesblocked']}&nbsp;</td>
-				<td>{$row['damage']}&nbsp;</td>
-				<td>{$row['healed']}&nbsp;</td>
-				<td>{$row['ubers']}&nbsp;</td>
-				<td>{$row['builtobjects']}&nbsp;</td>
-				<td>{$row['dominations']}&nbsp;</td>
-				<td>{$row['revenges']}&nbsp;</td>
-			</tr>
-EOT;
+		$ttr = "<tr class=\"tr3\"><td>&nbsp;</td><td><b>Totals</b></td><td>&nbsp;</td><td>{$row['points']}&nbsp;</td><td>{$row['kills']}&nbsp;</td><td>{$row['assists']}&nbsp;</td><td>{$row['deaths']}&nbsp;</td><td>{$row['caps']}&nbsp;</td><td>{$row['capturesblocked']}&nbsp;</td><td>{$row['damage']}&nbsp;</td><td>{$row['healed']}&nbsp;</td><td>{$row['ubers']}&nbsp;</td><td>{$row['builtobjects']}&nbsp;</td><td>{$row['dominations']}&nbsp;</td><td>{$row['revenges']}&nbsp;</td></tr>";
 		if (!strcmp($tteam,'Blue')) { $blue .= $ttr; }
 		else if (!strcmp($tteam,'Red')) { $red .= $ttr; }
 	}
@@ -1087,16 +1034,7 @@ EOT;
 	// -------------------------------------------------------------------------
 	// Main weapons table
 	// -------------------------------------------------------------------------
-	$trh = <<<EOT
-		<tr>
-			<th width=130px>Weapon</th>
-			<th width=50px>Total<br>Kills</th>
-			<th width=50px>Red<br>Kills</th>
-			<th width=50px>Blue<br>Kills</th>
-			<th>Biggest Killer</th>
-			<th width=50px>%<br>Total</th>
-		</tr>
-EOT;
+	$trh = "<tr><th width=130px>Weapon</th><th width=50px>Total<br>Kills</th><th width=50px>Red<br>Kills</th><th width=50px>Blue<br>Kills</th><th>Biggest Killer</th><th width=50px>%<br>Total</th></tr>";
 
 	$weap = "<div class='contentheader3'>Weapons</div><table class='maintable'>{$trh}";
 
@@ -1106,16 +1044,7 @@ EOT;
 		if (!strcmp($weapon,'all')) { continue; }
 		$tmp = $i++ % 2;
 		$percent = round($row['all']['kills'] * 100 / $weapons['all']['all']['kills']);
-		$tr = <<<EOT
-			<tr class="tr{$tmp}">
-				<td>{$weapon}</td>
-				<td>{$row['all']['kills']}</td>
-				<td>{$row['Red']['kills']}</td>
-				<td>{$row['Blue']['kills']}</td>
-				<td class="line{$row['all']['max_team']}"><a href="{$p[$row['all']['max_killer']]['html']}.html">{$p[$row['all']['max_killer']]['alias']}</a> - {$row['all']['max_kills']}</td>
-				<td>{$percent}</td>
-			</tr>
-EOT;
+		$tr = "<tr class=\"tr{$tmp}\"><td>{$weapon}</td><td>{$row['all']['kills']}</td><td>{$row['Red']['kills']}</td><td>{$row['Blue']['kills']}</td><td class=\"line{$row['all']['max_team']}\"><a href=\"{$p[$row['all']['max_killer']]['html']}.html\">{$p[$row['all']['max_killer']]['alias']}</a> - {$row['all']['max_kills']}</td><td>{$percent}</td></tr>";
 		$weap .= $tr;
 	}
 
