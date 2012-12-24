@@ -310,7 +310,7 @@ def countProtectedUsers():
 
 def connect():
     print [config.network, config.port, nick, name]
-    server.connect(config.network, config.port, nick, ircname = name)
+    server.connect(config.network, config.port, nick, ircname = name, localaddress = '96.126.116.93')
 
 def createUser(userName, userCommand, userAuthorizationLevel):
     commandList = string.split(userCommand, ' ')
@@ -1679,7 +1679,7 @@ lastGame = 0
 lastGameType = "normal"
 lastLargeOutput = time.time()
 lastUserPrint = time.time()
-mapList = ["cp_badlands", "cp_gullywash_final1", "cp_snakewater", "cp_granary", "cp_process_b10"]
+mapList = ["cp_badlands", "cp_gullywash_final1", "cp_snakewater", "cp_granary", "cp_process_rc2"]
 maximumUserLimit = 24
 minuteTimer = time.time()
 nominatedCaptains = []

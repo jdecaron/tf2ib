@@ -38,16 +38,13 @@ def book(userName, userCommand):
     server = getAvailableServer()
     if server:
         bookedTo = userName
-        serverPassword = getAServerPassword()
-        bookedServers[server['ip']] = [bookedTo, time.time(), serverPassword, server['ip']]
+        bookedServers[server['ip']] = [bookedTo, time.time(), "tf2pug", server['ip']]
         updateLast(server['ip'], '27015', time.time())
         send("PRIVMSG " + channel + " :\x030,01Server " + server['ip'] + " has been reserverd to " + bookedTo +  ". Servers are provided by cinq: \x0307,01http://atf2.org/")
-        send("PRIVMSG " + userName + " :The information to connect to the server is \"connect " + server['ip'] + ":27015; password " + serverPassword + "\". The server is being restarted, the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
+        send("PRIVMSG " + userName + " :The information to connect to the server is \"connect " + server['ip'] + ":27015; password tf2pug\". The server is being restarted, the server will be ready in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
         if bookedTo.lower() != userName.lower():
-            send("PRIVMSG " + bookedTo + " : A server has been booked for you and you have 60 minutes to use it. The information to connect to the server is \"connect " + server['ip'] + ":27015; password " + serverPassword + "\". The server is being restarted and the password will be set on it in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
+            send("PRIVMSG " + bookedTo + " : A server has been booked for you and you have 60 minutes to use it. The information to connect to the server is \"connect " + server['ip'] + ":27015; password tf2pug\". The server is being restarted, the server will be ready in 30 seconds. You can execute 3 commands on your servers : !config, !kick, !map. For more information about each commands type \"!man\".")
         executeRconCommand('_restart', server['ip'] + ':27015')
-        printTimer = threading.Timer(30, executeRconCommand, ['sv_password ' + serverPassword, server['ip'] + ':27015'])
-        printTimer.start()
     else:
         send("NOTICE " + userName + " : There is no available server to book at the moment.")
 
@@ -128,9 +125,6 @@ def extractUserName(user):
     else:
         return ''
 
-def getAServerPassword():
-    return serverPasswords[random.randint(0, len(serverPasswords) - 1)]
-
 def getAvailableServer():
     for server in getServerList():
         try:
@@ -138,7 +132,7 @@ def getAvailableServer():
             for s in serverInfo['serverStatus'].strip().split("\n"):
                 if re.search("^players", s):
                     serverInfo['playerCount'] = s.split(" ")[2]
-            if 3 > int(serverInfo['playerCount']) and re.search("^Tournament is not live", serverInfo['tournamentInfo']) and (time.time() - server['last']) >= (60 * 15):
+            if 3 > int(serverInfo['playerCount']) and re.search("^Tournament is not live", serverInfo['tournamentInfo']) and (time.time() - server['last']) >= (60 * 15) and server['last'] >= 0:
                 return {'ip':server['dns'], 'port':server['port']}
         except:
             print "Error processing the server info"
@@ -261,7 +255,6 @@ def map(userName, userCommand):
             else:
                 mapType = 'push'
         executeRconCommand('changelevel ' + map, bookedInfo[3] + ':27015')
-        executeRconCommand('sv_password ' + bookedInfo[2], bookedInfo[3] + ':27015')
         _config(userName, mapType, bookedInfo[3])
     else:
         send("NOTICE " + userName + " : Available maps : " + ", ".join(mapList))
@@ -338,9 +331,8 @@ adminList = {}
 bookedServers = {}
 botID = 1
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
-mapList = ["cp_badlands", "cp_follower", "cp_gravelpit", "cp_gullywash_final1", "cp_freight_final1", "cp_granary", "cp_process_b10", "cp_snakewater", "cp_yukon", "ctf_turbine", "koth_pro_viaduct_rc3"]
+mapList = ["cp_badlands", "cp_follower", "cp_gravelpit", "cp_gullywash_final1", "cp_freight_final1", "cp_granary", "cp_process_rc2", "cp_snakewater", "cp_yukon", "ctf_turbine", "koth_pro_viaduct_rc3"]
 restart = 0
-serverPasswords = ["heavymachinegun", "jetpack", "offensechamber", "chipotle", "lightninggun", "entourage", "california", "vmars", "gotfraggon", "bdropped", "miguelo", "steven", "haffey", "carbon", "sherwood", "foil", "broskow", "kansas", "dailybread", "habs", "eulogy", "valo", "remz", "poutine", "montreal", "sauce", "koubis", "nopole", "mrbishop", "quebec", "chadgap", "railfest", "banquise", "bebe"]
 userCommands = ["\\!book", "\\!changelevel", "\\!config", "\\!kick", "\\!man", "\\!map", "\\!status"]
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
 
