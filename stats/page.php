@@ -25,11 +25,54 @@ function return_page ($contents, $nav, $rel) {
 <link rel="stylesheet" type="text/css" href="{$path}global.css" media="screen">
 <title>#tf2.pug.na on irc.gamesurge.net</title>
 </head>
-
+<script>
+function sort(e, p){
+    a0 = new Array();
+    a1 = new Array();
+    b = '';
+    c = 0;
+    r = e.parentNode.parentNode;
+    n = e.innerHTML;
+    s0 = new Array();
+    s1 = new Array();
+    t = ''
+    while(r != null){
+        if(r.nodeName == "TR"){
+            if(c == 0){
+                t = '<tr>' + r.innerHTML + '</tr>';
+            }else{
+                a0.push({'p':p, 'r':r.innerHTML, 'v':r.childNodes[p].innerHTML.replace(',', '')});
+                a1.push(r.childNodes[p].innerHTML.replace(',', ''));
+            }
+        }
+        r = r.nextSibling;
+        c++;
+    }
+    b = a0.pop().r;
+    a1.pop();
+    a1.sort(function(x,y){return y-x});
+    content = '';
+    for(i = 0; i < a1.length; i++){
+        if(i % 2 == 0){
+            c1 = ' class=tr0';
+        }else{
+            c1 = ' class=tr1';
+        }
+        for(j = 0; j < a0.length; j++){
+            if(a1[i] == a0[j].v){
+                content += '<tr' + c1 + '>' + a0[j].r + '</tr>';
+                a0.splice(j, 1);
+                break;
+            }
+        }
+    }
+    e.parentNode.parentNode.parentNode.innerHTML = t + content + b;
+}
+</script>
 <body>
 <div id='container'>
 <div class='main'>
-	<div class='topheader'><div style="position:absolute;right:28px;width:200px;"><a href="http://aigaming.com/" ><img style="text-decoration:none;border:0px" src="ai.gif"></a></div><form name="input" action="/" method="get"><input type="text" name="search" value="{$_REQUEST['search']}"/><input type="submit" value="Search" style="margin-left:20px;" /></form></div></a>
+	<div class='topheader'><form name="input" action="/" method="get"><input type="text" name="search" value="{$_REQUEST['search']}"/><input type="submit" value="Search" style="margin-left:20px;" /></form></div></a>
 	<div class='content1'>
 		{$contents}
 	</div>
