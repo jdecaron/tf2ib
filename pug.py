@@ -1500,20 +1500,24 @@ def sendSteamAnnouncement(userName, userCommand):
     cookies = cookielib.CookieJar()
     data = urllib.urlencode({'username':'zerocinq', 'password':config.steamPassword, 'emailauth':'', 'captchagid':'-1', 'captcha_text':'', 'emailsteamid':''})
     site = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
+    page = site.open('https://steamcommunity.com/login/home/')
     page = site.open('https://store.steampowered.com/login/getrsakey/?username=zerocinq')
     page = json.load(page)
     file = open("crypto.js", "w")
-    #key = RSA.construct((long(page['publickey_mod'], 16), long(page['publickey_exp'], 16)))
     file.write("var crypto = {\"publickey_mod\":\"" + page['publickey_mod'] + "\", \"publickey_exp\":\"" + page['publickey_exp'] + "\", \"password\":\"" + config.steamPassword + "\"}")
     file.close()
     steamPassword = subprocess.Popen(["js", "-f", "rsa.js"], stdout=subprocess.PIPE)
     steamPassword = steamPassword.stdout.readline()
     data = urllib.urlencode({'captcha_text':'', 'captchagid':'-1', 'emailauth':'', 'password':steamPassword, 'rsatimestamp':page['timestamp'], 'username':'zerocinq'})
     page = site.open('https://steamcommunity.com/login/dologin/', data)
-    print data
     print page.read()
-    data = urllib.urlencode({'action':'post', 'body':userCommand, 'headline':'Report by: ' + userName})
+    sessionid = ''
+    for cookie in cookies:
+        if cookie.name == 'sessionid':
+            sessionid = urllib.unquote(cookie.value)
+    data = urllib.urlencode({'action':'post', 'body':userCommand, 'headline':'Report by: ' + userName, 'sessionID':sessionid})
     page = site.open('http://steamcommunity.com/groups/thestick/announcements', data)
+    print page.read()
 
 def setIP(userName, userCommand):
     global gameServer
