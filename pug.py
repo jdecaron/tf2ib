@@ -1,16 +1,21 @@
 #!/usr/bin/python
 
 import config
+import cookielib
 import irclib
+import json
 import math
 import psycopg2
 import random
 import re
+import subprocess
 import string
 import SRCDS
 import thread
 import threading
 import time
+import urllib
+import urllib2
 
 #irclib.DEBUG = 1
 
@@ -24,10 +29,10 @@ def add(userName, userCommand, ninjAdd = 0):
         print medicStats
         """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-            return 0
+            return 0"""
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access to add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
-            return 0"""
+            return 0
         if state == 'captain' or state == 'highlander' or state == 'normal':
             remove(userName, 0)
             if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
@@ -310,7 +315,7 @@ def countProtectedUsers():
 
 def connect():
     print [config.network, config.port, nick, name]
-    server.connect(config.network, config.port, nick, ircname = name, localaddress = '96.126.116.93')
+    server.connect(config.network, config.port, nick, ircname = name)
 
 def createUser(userName, userCommand, userAuthorizationLevel):
     commandList = string.split(userCommand, ' ')
@@ -390,6 +395,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!limit', escapedUserCommand):
         limit(userName, userCommand)
         return 0
+    if re.search('^\\\\!list', escapedUserCommand):
+        players(userName)
+        return 0
     if re.search('^\\\\!map$', escapedUserCommand):
         map()
         return 0
@@ -431,6 +439,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!remove', escapedUserCommand):
         remove(userName)
+        return 0
+    if re.search('^\\\\!report', escapedUserCommand):
+        report(userName, userCommand)
         return 0
     if re.search('^\\\\!restart', escapedUserCommand):
         restartBot()
@@ -806,6 +817,7 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
+    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
@@ -1369,6 +1381,9 @@ def removeLastEscapeCharacter(userCommand):
         userCommand = userCommand[0:len(userCommand) - 1]
     return userCommand
 
+def report(userName, userCommand):
+    thread.start_new_thread(sendSteamAnnouncement, (userName, userCommand))
+
 def resetVariables():
     global allowFriends, captainStage, captainStageList, gameServer, teamA, teamB, userLimit, userList
     allowFriends = 1
@@ -1480,6 +1495,25 @@ def sendStartPrivateMessages():
             send("PRIVMSG " + user['nick'] + " :You have been assigned to the " + teamName[teamCounter] + " team. Connect as soon as possible to this TF2 server : \"connect " + gameServer + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2mix\". \x0307SteamLinker : \x03tf://" + gameServer + "/" + password)
             userCounter += 1
         teamCounter += 1
+
+def sendSteamAnnouncement(userName, userCommand):
+    cookies = cookielib.CookieJar()
+    data = urllib.urlencode({'username':'zerocinq', 'password':config.steamPassword, 'emailauth':'', 'captchagid':'-1', 'captcha_text':'', 'emailsteamid':''})
+    site = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
+    page = site.open('https://store.steampowered.com/login/getrsakey/?username=zerocinq')
+    page = json.load(page)
+    file = open("crypto.js", "w")
+    #key = RSA.construct((long(page['publickey_mod'], 16), long(page['publickey_exp'], 16)))
+    file.write("var crypto = {\"publickey_mod\":\"" + page['publickey_mod'] + "\", \"publickey_exp\":\"" + page['publickey_exp'] + "\", \"password\":\"" + config.steamPassword + "\"}")
+    file.close()
+    steamPassword = subprocess.Popen(["js", "-f", "rsa.js"], stdout=subprocess.PIPE)
+    steamPassword = steamPassword.stdout.readline()
+    data = urllib.urlencode({'captcha_text':'', 'captchagid':'-1', 'emailauth':'', 'password':steamPassword, 'rsatimestamp':page['timestamp'], 'username':'zerocinq'})
+    page = site.open('https://steamcommunity.com/login/dologin/', data)
+    print data
+    print page.read()
+    data = urllib.urlencode({'action':'post', 'body':userCommand, 'headline':'Report by: ' + userName})
+    page = site.open('http://steamcommunity.com/groups/thestick/announcements', data)
 
 def setIP(userName, userCommand):
     global gameServer
@@ -1694,7 +1728,7 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!man", "\\!map", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
