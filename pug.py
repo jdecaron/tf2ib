@@ -19,7 +19,7 @@ import urllib2
 
 #irclib.DEBUG = 1
 
-def add(userName, userCommand, ninjAdd = 0):
+def add(userName, userCommand):
     global state, userLimit, userList
     print "State : " + state
     userAuthorizationLevel = isAuthorizedToAdd(userName)
@@ -42,16 +42,7 @@ def add(userName, userCommand, ninjAdd = 0):
                     stats(userName, "!stats " + userName)
                     send("NOTICE " + userName + " : The only class available is medic. Type \"!add medic\" to join this round as this class.")
                     return 0
-            if userAuthorizationLevel == 3 and not isUser(userName) and len(userList) == userLimit:
-                userLimit = userLimit + 1
-            if len(extractClasses(userCommand)) == 0:
-                send("NOTICE " + userName + " : " + "Error! You need to specify a class. Example : \"!add scout\".")
-                return 0
-            elif len(extractClasses(userCommand)) > 1:
-                send("NOTICE " + userName + " : " + "Error! You can only add as one class.")
-                return 0
-            elif extractClasses(userCommand)[0] not in getAvailableClasses():
-                send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(getAvailableClasses()) + ".")
+            if not classValidation(userName, userCommand):
                 return 0
             if len(userList) < userLimit:
                 print "User add : " + userName + "  Command : " + userCommand
@@ -108,7 +99,7 @@ def addFriend(userName, userCommand):
 
 def addGame(userName, userCommand):
     resetVariables()
-    global allowFriends, classList, gameServer, lastGameType, state, userLimit
+    global allowFriends, classList, gameServer, lastGameType, state, surferList, userLimit
     if not setIP(userName, userCommand):
         return 0
     # Game type.
@@ -118,6 +109,10 @@ def addGame(userName, userCommand):
         lastGameType = 'captain'
         state = 'captain'
         userLimit = 24
+        surferListCopy = surferList.copy()
+        for surfer in surferListCopy:
+            add(surfer, surferListCopy[surfer]['command'])
+        surferList = {}
     elif re.search('highlander', userCommand):
         allowFriends = 0
         classList = ['demo', 'engineer', 'heavy', 'medic', 'pyro', 'scout', 'sniper', 'soldier', 'spy']
@@ -208,7 +203,7 @@ def authorize(userName, userCommand, userLevel = 1):
     elif userLevel == 1:
         authorizationText = 'authorized'
     elif userLevel == 2:
-        authorizationText = 'protected'
+        authorizationText = 'invited'
     else:
         authorizationText = 'invited'
     if userLevel > 1 and adminLevel <= 250:
@@ -266,14 +261,31 @@ def checkConnection():
         connect()
     server.join(config.channel)
 
-def classCount(gameClass):
-    global userList
+def classCount(gameClass, listToUse = 'userList'):
+    global surferList, userList
+    if listToUse == 'userList':
+        listToUse = userList
+    else:
+        listToUse = surferList
     counter = 0
-    for i, j in userList.copy().iteritems():
-        for userClass in userList[i]['class']:
+    for i, j in listToUse.copy().iteritems():
+        for userClass in listToUse[i]['class']:
             if userClass == gameClass:
                 counter += 1
     return counter            
+
+def classValidation(userName, userCommand, listToUse = 'userList'):
+        if len(extractClasses(userCommand)) == 0:
+            send("NOTICE " + userName + " : " + "Error! You need to specify a class. Example : \"!add scout\".")
+            return 0
+        elif len(extractClasses(userCommand)) > 1:
+            send("NOTICE " + userName + " : " + "Error! You can only add as one class.")
+            return 0
+        elif extractClasses(userCommand)[0] not in getAvailableClasses(listToUse):
+            send("NOTICE " + userName + " : The class you specified is not in the available class list : " + ", ".join(getAvailableClasses(listToUse)) + ".")
+            return 0
+        else:
+            return 1
 
 def cleanUserCommand(command):
     return re.escape(command)
@@ -301,17 +313,6 @@ def countCaptains():
         if userListCopy[user]['status'] == 'captain':
             counter = counter + 1
     return counter
-
-def countProtectedUsers():
-    invitedCounter = 0
-    protectedCounter = 0
-    userListCopy = userList.copy()
-    for user in userListCopy:
-        if userListCopy[user]['authorization'] == 2:
-            protectedCounter = protectedCounter + 1
-        elif userListCopy[user]['authorization'] == 3:
-            invitedCounter = invitedCounter + 1
-    return [invitedCounter, protectedCounter]
 
 def connect():
     print [config.network, config.port, nick, name]
@@ -416,9 +417,6 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!needsub', escapedUserCommand):
         needsub(userName, userCommand)
         return 0
-    if re.search('^\\\\!ninjadd', escapedUserCommand):
-        ninjadd(userName, userCommand)
-        return 0
     if re.search('^\\\\!notice', escapedUserCommand):
         notice(userName)
         return 0
@@ -427,9 +425,6 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!players', escapedUserCommand):
         players(userName)
-        return 0
-    if re.search('^\\\\!protect', escapedUserCommand):
-        protect(userName, userCommand)
         return 0
     if re.search('^\\\\!prototype*', escapedUserCommand):
         prototype()
@@ -460,6 +455,12 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!sub', escapedUserCommand):
         sub(userName, userCommand)
+        return 0
+    if re.search('^\\\\!surf\\\\ ', escapedUserCommand):
+        surf(userName, userCommand)
+        return 0
+    if re.search('^\\\\!surfer', escapedUserCommand):
+        surfer(userName, userCommand)
         return 0
     if re.search('^\\\\!votemap', escapedUserCommand):
         #votemap(userName, escapedUserCommand)
@@ -576,7 +577,7 @@ def getAuthorizationStatus(userName):
         return [userName, row[1], row[2], row[3], row[4]]
     return [userName, 0, 0, 0, '']
 
-def getAvailableClasses():
+def getAvailableClasses(listToUse = 'userList'):
     availableClasses = []
     if userLimit == 12:
         numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
@@ -585,7 +586,7 @@ def getAvailableClasses():
     if getTeamSize() == 9:
         numberOfPlayersPerClass = {'demo':2, 'engineer':2, 'heavy':2, 'medic':2, 'pyro':2, 'scout':2, 'sniper':2, 'soldier':2, 'spy':2}
     for gameClass in classList:
-        if classCount(gameClass) < numberOfPlayersPerClass[gameClass]:
+        if classCount(gameClass, listToUse) < numberOfPlayersPerClass[gameClass]:
             availableClasses.append(gameClass)
     return availableClasses
 
@@ -663,32 +664,6 @@ def getNextSubID():
         if sub['id'] > highestID:
             highestID = sub['id']
     return highestID + 1
-
-def getNinjaddSpot(userClass):
-    if userClass in getAvailableClasses():
-        return 1
-    potentialNinjaddSpot = []
-    for user in userList.copy():
-        if userClass in userList[user]['class']:
-            potentialNinjaddSpot.append({'nick':user, 'ratio':0})
-    lowestRatio = 1
-    for i in reversed(range(len(potentialNinjaddSpot))):
-        if getLastTimeMedic(potentialNinjaddSpot[i]['nick']) > time.time() - (60 * 60 * 24):
-            del potentialNinjaddSpot[i]
-            continue
-        winStats = getWinStats(potentialNinjaddSpot[i]['nick'])
-        ratio = 0
-        if winStats:
-            ratio = float(getMedicStats(potentialNinjaddSpot[i]['nick'])['totalGamesAsMedic']) / float(winStats[4])
-            potentialNinjaddSpot[i]['ratio'] = ratio
-        if ratio < lowestRatio:
-            lowestRatio = ratio
-    for i in range(len(potentialNinjaddSpot)):
-        if potentialNinjaddSpot[i]['ratio'] < 0.10 and potentialNinjaddSpot[i]['ratio'] == lowestRatio:
-            send("PRIVMSG " + potentialNinjaddSpot[i]['nick'] + ' :You got removed from the PUG because somebody ninjadded and stole your spot. To protect yourself from a future similar situation you can increase your medic ratio at 10% or have played medic in the last 24 hours.')
-            remove(potentialNinjaddSpot[i]['nick'])
-            return 1
-    return 0
 
 def getNumberOfFriendsPerClass(gameClass):
     if gameClass == 'medic':
@@ -817,7 +792,6 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
-    return 500
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
@@ -1087,23 +1061,6 @@ def nickchange(connection, event):
         userList[newUserName]['nick'] = newUserName
         del userList[oldUserName]
 
-def ninjadd(userName, userCommand):
-    """if time.time() - getLastTimeMedic(userName) >= (60 * 60 * 24):
-        send("NOTICE " + userName + " : Error, you need to have played medic at least once in the last 24 hours to be able to \"!ninjadd\".") 
-        #return 0"""
-    medicStats = getMedicStats(userName)
-    if medicStats['medicWinRatio'] < 0.40:
-        send("NOTICE " + userName + " : Error, you need to have a win ratio above 40% as medic to be able to \"!ninjadd\".") 
-        return 0
-    winStats = getWinStats(userName)
-    if not winStats or winStats[1] < 20:
-        send("NOTICE " + userName + " : Error, you need to have played more than 20 games to be able to \"!ninjadd\".")
-        return 0
-    if not winStats or float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.16:
-        send("NOTICE " + userName + " : Error, you need to have a medic ratio above 16% to be able to \"!ninjadd\".")
-        return 0
-    add(userName, userCommand, 1)
-
 def notice(userName):
     send("NOTICE " + userName + " : Notice!!!!")
 
@@ -1199,23 +1156,18 @@ def printCaptainChoices(printType = 'private'):
         captainName = getCaptainNameFromTeam(captainStageList[captainStage])
         captainColor = '\x0312'
         followingColor = '\x035'
-        protectedColor = '\x033'
         dataPrefix = "NOTICE " + captainName + " : "
         send(dataPrefix + captainName + ", you are captain of a team and it's your turn to pick a player. Type \"!pick nick class\" to add somebody in your team.") 
         send(dataPrefix + "Remaining classes : " +  ', '.join(getRemainingClasses())) 
     else:
         captainColor = '\x038,01'
         followingColor = '\x030,01'
-        protectedColor = '\x039,01'
         dataPrefix = "PRIVMSG " + config.channel + " :\x030,01"
     for gameClass in classList:
         choiceList = []
         for userName in userList.copy():
             if gameClass in userList[userName]['class']:
-                protected = ''
-                """if userList[userName]['authorization'] > 1 and printType == 'private':
-                    protected = protectedColor + 'P' + followingColor"""
-                choiceList.append("(" + str(getPlayerNumber(userName)) + protected + ")" + userName)
+                choiceList.append("(" + str(getPlayerNumber(userName)) + ")" + userName)
         if len(choiceList):
             send(dataPrefix + gameClass.capitalize() + "s: " + ', '.join(choiceList)) 
     choiceList = []
@@ -1223,10 +1175,7 @@ def printCaptainChoices(printType = 'private'):
         captain = ''
         if userList[userName]['status'] == 'captain':
             captain = captainColor + 'C' + followingColor
-        protected = ''
-        """if userList[userName]['authorization'] > 1:
-            protected = protectedColor + 'P' + followingColor"""
-        choiceList.append("(" + str(getPlayerNumber(userName)) + captain + protected + ")" + userName)
+        choiceList.append("(" + str(getPlayerNumber(userName)) + captain + ")" + userName)
     send(dataPrefix +  str(len(choiceList))+ " user(s) : " + ', '.join(choiceList)) 
 
 def printSubs():
@@ -1307,12 +1256,9 @@ def printUserList():
         printTimer.start()
     lastUserPrint = time.time()
 
-def protect(userName, userCommand):
-    authorize(userName, userCommand, 2)
-
 def prototype():
     print "prototype"
-    getAvailableServer()
+    print surferList
 
 def replace(userName, userCommand):
     global userList
@@ -1362,6 +1308,10 @@ def remove(userName, printUsers = 1):
         initTimer.cancel()
         if printUsers:
             printUserList()
+    try:
+        del surferList[userName]
+    except:
+        return 0
 
 def removeAwayUsers():
     global awayList, awayTimer
@@ -1589,7 +1539,7 @@ def stats(userName, userCommand):
     if authorizationStatus[1] == 1:
         authorizationStatus = ' Authorized by ' + authorizationStatus[4] + '.'
     elif authorizationStatus[1] == 2:
-        authorizationStatus = ' Protected by ' + authorizationStatus[4] + '.'
+        authorizationStatus = ' Authorized to surf by ' + authorizationStatus[4] + '.'
     elif authorizationStatus[1] == 3:
         authorizationStatus = ' Invited by ' + authorizationStatus[4] + '.'
     elif authorizationStatus[4] != '':
@@ -1639,6 +1589,22 @@ def sub(userName, userCommand):
     send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2mix\".")
     del(subList[subIndex])
     return 0
+
+def surf(userName, userCommand):
+    if state == 'captain':
+        add(userName, userCommand)
+        return 0
+    userAuthorizationLevel = isAuthorizedToAdd(userName)
+    if userAuthorizationLevel < 2:
+        send("NOTICE " + userName + " : You must be a surfer to ride those big waves!")
+        return 0
+    if not classValidation(userName, userCommand, 'surferList'):
+        return 0
+    send("NOTICE " + userName + " : Enjoy the ride!")
+    surferList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
+
+def surfer(userName, userCommand):
+    authorize(userName, userCommand, 2)
 
 def updateLast(ip, port, last):
     global botID, connection
@@ -1732,7 +1698,8 @@ restart = 0
 scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!ninjadd", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!protect", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!votemap", "\\!whattimeisit"]
+surferList = {}
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
