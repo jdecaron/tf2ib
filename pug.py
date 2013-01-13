@@ -194,8 +194,10 @@ def authorize(userName, userCommand, userLevel = 1):
         send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid \"!authorize\" command : \"!authorize nick level\". The level is a value ranging from 0 to 500.")
         return 0
     adminLevel = isAdmin(userName)
-    if len(commandList) == 3 and commandList[2] != '' and re.match('^\d*$', commandList[2]) and int(commandList[2]) < adminLevel:
+    if len(commandList) == 3 and commandList[2] != '' and re.match('^\d*$', commandList[2]) and int(commandList[2]) <= adminLevel:
         adminLevel = int(commandList[2])
+    elif adminLevel > 200:
+        adminLevel = 200
     authorizationStatus = getAuthorizationStatus(commandList[1])
     authorizationText = ''
     if userLevel == 0:
@@ -363,6 +365,9 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!addgame', escapedUserCommand):
         addGame(userName, userCommand)
         return 0
+    if re.search('^\\\\!admin', escapedUserCommand):
+        report(userName, userCommand)
+        return 0
     if re.search('^\\\\!authorize', escapedUserCommand):
         authorize(userName, userCommand)
         return 0
@@ -448,7 +453,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         scramble(userName)
         return 0
     if re.search('^\\\\!stats', escapedUserCommand):
-        stats(userName, userCommand)
+        stats(userName, escapedUserCommand)
         return 0
     if re.search('^\\\\!status', escapedUserCommand):
         thread.start_new_thread(status, ())
@@ -523,40 +528,33 @@ def game(userName, userCommand):
 def getAPlayer(playerType):
     global userList
     if playerType == 'captain':
-        medics = []
-        medicsCaptains = []
-        otherCaptains = []
+        medicsCaptains = {}
+        otherCaptains = {}
+        statusCaptains = {}
+        statusMedicsCaptains = {}
         userListCopy = userList.copy()
         for user in userListCopy:
-            if re.search('medic', userListCopy[user]['command']):
-                if userListCopy[user]['status'] == 'captain':
-                    medicsCaptains.append(userListCopy[user])
-                else:
-                    medics.append(userListCopy[user])
-            elif userListCopy[user]['status'] == 'captain':
-                otherCaptains.append(userListCopy[user])
-        if len(medicsCaptains) > 0:
-            player = getRandomItemFromList(medicsCaptains)
-            player['class'] = ['medic']
-        elif len(otherCaptains) > 0:
-            maximum = 0
-            otherCaptainWithMaximumRatio = ''
-            for otherCaptain in otherCaptains:
-                winStats = getWinStats(otherCaptain['nick'])
-                if winStats[3] > maximum:
-                    maximum = winStats[3]
-                    otherCaptainWithMaximumRatio = otherCaptain['nick']
-            if maximum > 0:
-                player = userListCopy[otherCaptainWithMaximumRatio]
-            else:
-                player = getRandomItemFromList(otherCaptains)
-            if len(player['class']) > 0:
-                player['class'] = [player['class'][0]]
-            else:
-                player['class'] = ['scout']
-        else:
-            player = getRandomItemFromList(medics)
-            player['class'] = ['medic']
+            authorizationStatus = getAuthorizationStatus(user)
+            print user
+            print authorizationStatus
+            print ''
+            winStats = getWinStats(user)
+            if userListCopy[user]['status'] == 'captain':
+                otherCaptains[user] = winStats[4]
+                if authorizationStatus[1] >= 2:
+                    statusCaptains[user] = winStats[4]
+                    if re.search('medic', userListCopy[user]['command']):
+                        statusMedicsCaptains[user] = winStats[4]
+                elif re.search('medic', userListCopy[user]['command']):
+                    medicsCaptains[user] = winStats[4]
+        if len(statusMedicsCaptains) > 0:
+            player = userListCopy[getTopItemFromList(statusMedicsCaptains)]
+        elif len(statusCaptains) > 0: 
+            player = userListCopy[getTopItemFromList(statusCaptains)]
+        elif len(medicsCaptains) > 0: 
+            player = userListCopy[getTopItemFromList(medicsCaptains)]
+        else: 
+            player = userListCopy[getTopItemFromList(otherCaptains)]
         return player
     else:
         forcedList = []
@@ -756,6 +754,15 @@ def getTeamSize():
     if len(classList) == 9:
         teamSize = 9
     return teamSize
+
+def getTopItemFromList(list):
+    maximumItem = 0
+    maximumValue = 0
+    for i in list:
+        if list[i] >= maximumValue:
+            maximumItem = i
+            maximumValue = list[i]
+    return maximumItem
 
 def getUserCount():
     global teamA, teamB, userList
@@ -1257,8 +1264,7 @@ def printUserList():
     lastUserPrint = time.time()
 
 def prototype():
-    print "prototype"
-    print surferList
+    getAPlayer('captain')
 
 def replace(userName, userCommand):
     global userList
@@ -1492,6 +1498,7 @@ def startGame():
     saveStats()
     sendStartPrivateMessages()
     updateLast(string.split(gameServer, ':')[0], string.split(gameServer, ':')[1], initTime)
+    autoGameStart()
 
 def stats(userName, userCommand):
     commandList = string.split(userCommand, ' ')
@@ -1699,7 +1706,7 @@ scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
 surferList = {}
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!admin", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
