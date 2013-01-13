@@ -208,7 +208,7 @@ def authorize(userName, userCommand, userLevel = 1):
         authorizationText = 'invited'
     else:
         authorizationText = 'invited'
-    if userLevel > 1 and adminLevel <= 250:
+    if userLevel > 1 and adminLevel < 200:
         send("NOTICE " + userName + " : Error, you lack access to this command.") 
         return 0
     if(authorizationStatus[2] > adminLevel):
