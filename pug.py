@@ -1474,6 +1474,7 @@ def sendSteamAnnouncement(userName, userCommand):
     data = urllib.urlencode({'action':'post', 'body':userCommand, 'headline':'Report by: ' + userName, 'sessionID':sessionid})
     page = site.open('http://steamcommunity.com/groups/thestick/announcements', data)
     print page.read()
+    send("NOTICE " + userName + " : You successfully reported to an admin, the next available one should contact you as soon as possible.")
 
 def setIP(userName, userCommand):
     global gameServer
