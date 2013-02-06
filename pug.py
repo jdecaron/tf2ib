@@ -492,12 +492,16 @@ def extractUserName(user):
 
 def findAwayUsers():
     global awayList, userList
-    if type(awayTimer).__name__ == 'float' and time.time() - awayTimer <= (5 * 60):
+    if type(awayTimer).__name__ == 'float' and time.time() - awayTimer <= (3 * 60):
         awayList = {}
     elif len(awayList) == 0:
         for user in userList:
-            if user in userList and userList[user]['last'] <= (time.time() - (7 * 60)):
-                awayList[user] = userList[user]
+            if user in userList:
+                if userList[user]['status'] == 'captain':
+                    if userList[user]['last'] <= (time.time() - (5 * 60)):
+                        awayList[user] = userList[user]
+                elif userList[user]['last'] <= (time.time() - (20 * 60)):
+                    awayList[user] = userList[user]
     return awayList
 
 def force(userName):
@@ -783,7 +787,7 @@ def getWinStats(userName):
     return [userName, 0, 0, 0, 0]
 
 def help():
-    send("PRIVMSG " + config.channel + " :\x030,01Visit \x0311,01http://steamcommunity.com/groups/tf2mix/discussions/0/882961586767057144/\x030,01 to get help about the PUG process.")
+    send("PRIVMSG " + config.channel + " :\x030,01If you need the help of an admin type !admin, for any other help please visit \x0311,01http://steamcommunity.com/groups/tf2mix/discussions/0/882961586767057144/\x030,01 to get help about the PUG process.")
 
 def invite(userName, userCommand):
     authorize(userName, userCommand, 3)
