@@ -461,7 +461,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!sub', escapedUserCommand):
         sub(userName, userCommand)
         return 0
-    if re.search('^\\\\!surf\\\\ ', escapedUserCommand):
+    if re.search('^\\\\!surf$', escapedUserCommand) or re.search('^\\\\!surf\\\\ ', escapedUserCommand):
         surf(userName, userCommand)
         return 0
     if re.search('^\\\\!surfer', escapedUserCommand):
@@ -1606,14 +1606,18 @@ def surf(userName, userCommand):
     if state == 'captain':
         add(userName, userCommand)
         return 0
-    userAuthorizationLevel = isAuthorizedToAdd(userName)
-    if userAuthorizationLevel < 2:
-        send("NOTICE " + userName + " : You must be a surfer to ride those big waves!")
-        return 0
     if not classValidation(userName, userCommand, 'surferList'):
         return 0
+    userAuthorizationLevel = isAuthorizedToAdd(userName)
+    if userAuthorizationLevel < 2:
+        winStats = getWinStats(userName)
+        medicStats = getMedicStats(userName)
+        if winStats[4] < 50 or float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.15:
+            send("NOTICE " + userName + " : You do not meet the requirements to use the !surf command. You either need to have the surfer status or have at least 50 games played with a medic ratio above 15%.")
+            return 0
     send("NOTICE " + userName + " : Enjoy the ride!")
     surferList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
+    print surferList
 
 def surfer(userName, userCommand):
     authorize(userName, userCommand, 2)
