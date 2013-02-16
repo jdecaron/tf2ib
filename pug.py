@@ -29,10 +29,10 @@ def add(userName, userCommand):
         print medicStats
         """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
-            return 0"""
+            return 0
         if not userAuthorizationLevel:
             send("NOTICE " + userName + " : You must be authorized by an admin to PUG here. Ask any peons or any admins to allow you the access to add to the PUGs. The best way to do it is by asking directly in the channel or by asking a friend that has the authorization to do it. If you used to have access, type \"!stats me\" in order to find who deleted your access and talk with him in order to get it back.")
-            return 0
+            return 0"""
         if state == 'captain' or state == 'highlander' or state == 'normal':
             remove(userName, 0)
             if ((len(userList) == (userLimit -1) and classCount('medic') == 0) or (len(userList) == (userLimit -1) and classCount('medic') <= 1)) and not isMedic(userCommand):
@@ -461,7 +461,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!sub', escapedUserCommand):
         sub(userName, userCommand)
         return 0
-    if re.search('^\\\\!surf\\\\ ', escapedUserCommand):
+    if re.search('^\\\\!surf$', escapedUserCommand) or re.search('^\\\\!surf\\\\ ', escapedUserCommand):
         surf(userName, userCommand)
         return 0
     if re.search('^\\\\!surfer', escapedUserCommand):
@@ -1606,14 +1606,18 @@ def surf(userName, userCommand):
     if state == 'captain':
         add(userName, userCommand)
         return 0
-    userAuthorizationLevel = isAuthorizedToAdd(userName)
-    if userAuthorizationLevel < 2:
-        send("NOTICE " + userName + " : You must be a surfer to ride those big waves!")
-        return 0
     if not classValidation(userName, userCommand, 'surferList'):
         return 0
+    userAuthorizationLevel = isAuthorizedToAdd(userName)
+    if userAuthorizationLevel < 2:
+        winStats = getWinStats(userName)
+        medicStats = getMedicStats(userName)
+        if winStats[4] < 50 or float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.15:
+            send("NOTICE " + userName + " : You do not meet the requirements to use the !surf command. You either need to have the surfer status or have at least 50 games played with a medic ratio above 15%.")
+            return 0
     send("NOTICE " + userName + " : Enjoy the ride!")
     surferList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
+    print surferList
 
 def surfer(userName, userCommand):
     authorize(userName, userCommand, 2)
