@@ -887,7 +887,7 @@ def isUserCountOverLimit():
         return 1
 
 def initGame():
-    global gameServer, initTime, initTimer, nick, pastGames, scrambleList, startGameTimer, state, teamA, teamB
+    global gameServer, initTime, initTimer, nick, pastGames, scrambleList, startGameTimer, state, teamA, teamB, timerInfo
     if state == 'building' or state == 'picking':
         return 0
     initTime = int(time.time())
@@ -902,6 +902,7 @@ def initGame():
         initTimer.start()
         startGameTimer = threading.Timer(100, startGame)
         startGameTimer.start()
+        timerInfo = int(time.time())
     elif state == "captain":
         if countCaptains() < 2:
             return 0
@@ -1389,31 +1390,35 @@ def saveToLogs(data):
         logFile.close()
 
 def scramble(userName, force = 0):
-    global scrambleList, startGameTimer, teamA, teamB, userList
+    global scrambleList, startGameTimer, teamA, teamB, timerInfo, userList
     if len(teamA) == 0:
         send("NOTICE " + userName + " :Wait until the teams are drafted to use this command.")
         return 0
     if not startGameTimer.isAlive():
-        send("NOTICE " + userName + " :You have a maximum of 1 minute after the teams got originally drafted to use this command.")
+        send("NOTICE " + userName + " :There's no more time remaining to scramble the teams.")
         return 0
     found = 0
     pastGameIndex = len(pastGames) - 1
     for i in pastGames[pastGameIndex]['players']:
         if i['nick'] == userName:
             found = 1
+    remainingTime = 0
     if (len(scrambleList) >= 2 and userName not in scrambleList and found) or force:
-        """if int(time.time()) - initTime >= 70:
-            print "moretime"
+        if int(time.time()) - initTime >= 70:
+            remainingTime = 40
             startGameTimer.cancel()
-            startGameTimer = threading.Timer(30, startGame)
-            startGameTimer.start()"""
+            startGameTimer = threading.Timer(40, startGame)
+            startGameTimer.start()
+            timerInfo = int(time.time())
+        else:
+            remainingTime = 100 - (int(time.time()) - initTime)
         scrambleList = []
         teamA = []
         teamB = []
         for i in pastGames[pastGameIndex]['players']:
             userList[i['nick']] = i
+        send("PRIVMSG " + config.channel + " :\x037,01Teams got scrambled, " + str(remainingTime) + " seconds remaining before teams are locked.")
         buildTeams()
-        send("PRIVMSG " + config.channel + " :\x037,01Teams got scrambled.")
     elif userName not in scrambleList and found:
         scrambleList.append(userName)
     print scrambleList
@@ -1715,6 +1720,7 @@ scrambleList = []
 startGameTimer = threading.Timer(0, None)
 subList = []
 surferList = {}
+timerInfo = 0
 userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!admin", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit"]
 userLimit = 12
 userList = {}
