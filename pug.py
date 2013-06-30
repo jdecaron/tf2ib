@@ -72,6 +72,8 @@ def add(userName, userCommand):
                     sendMessageToAwayPlayers()
         elif state == 'picking':
             if initTimer.isAlive():
+                if not classValidation(userName, userCommand):
+                    return 0
                 if isInATeam(userName):
                     return 0
                 if isUserCountOverLimit():
@@ -330,7 +332,7 @@ def createUser(userName, userCommand, userAuthorizationLevel):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        if 'medic' not in user['class'] and getWinStats(userName)[1] < 0:
+        if 'medic' not in user['class'] and getWinStats(userName)[1] < 20:
             send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played.")
         else:
             user['status'] = 'captain'
@@ -803,6 +805,7 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
+    return 1
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
