@@ -1678,7 +1678,7 @@ def updateUserStatus(nick, escapedUserCommand):
             userList[nick]['last'] = time.time()
         if nick in awayList:
             del awayList[nick]
-        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('pocket') < 2 or classCount('roamer') < 2:
+        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('pocket') < 2 or classCount('roamer') < 2):
             return 0
         if len(userList) >= numberOfPlayers and len(awayList) == 0 and classCount('medic') >= numberOfMedics:
             initGame()
