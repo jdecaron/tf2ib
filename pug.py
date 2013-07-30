@@ -49,7 +49,7 @@ def add(userName, userCommand):
                 userList[userName] = createUser(userName, userCommand, userAuthorizationLevel)
                 printUserList()
             if len(userList) >= (getTeamSize() * 2) and classCount('medic') > 1:
-                if classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 4:
+                if classCount('demo') < 2 or classCount('scout') < 4 or classCount('pocket') < 2 or classCount('pocket') < 2:
                     return 0
                 if state == 'captain' and countCaptains() < 2:
                     send("PRIVMSG " + config.channel + " :\x037,01Warning!\x030,01 This PUG need 2 captains to start.")
@@ -74,6 +74,11 @@ def add(userName, userCommand):
             if initTimer.isAlive():
                 if not classValidation(userName, userCommand):
                     return 0
+                if userName in userList:
+                    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'pocket':2, 'roamer':2}
+                    if classCount(userList[userName]['class']) < numberOfPlayersPerClass[userList[userName]['class']]:
+                        send("NOTICE " + userName + " : There aren't enough players in the class you previously added up as. You cannot switch at this time.")
+                        return 0
                 if isInATeam(userName):
                     return 0
                 if isUserCountOverLimit():
@@ -107,7 +112,7 @@ def addGame(userName, userCommand):
     # Game type.
     if re.search('captain', userCommand):
         allowFriends = 0
-        classList = ['demo', 'medic', 'scout', 'soldier']
+        classList = ['demo', 'medic', 'scout', 'pocket', 'roamer']
         lastGameType = 'captain'
         state = 'captain'
         userLimit = 24
@@ -123,7 +128,7 @@ def addGame(userName, userCommand):
         userLimit = 18
     else:
         allowFriends = 0
-        classList = ['demo', 'medic', 'scout', 'soldier']
+        classList = ['demo', 'medic', 'scout', 'pocket', 'roamer']
         lastGameType = 'normal'
         state = 'normal'
         userLimit = 12
@@ -584,9 +589,9 @@ def getAuthorizationStatus(userName):
 def getAvailableClasses(listToUse = 'userList'):
     availableClasses = []
     if userLimit == 12:
-        numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+        numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'pocket':2, 'roamer':2}
     elif userLimit == 24:
-        numberOfPlayersPerClass = {'demo':4, 'medic':4, 'scout':8, 'soldier':8}
+        numberOfPlayersPerClass = {'demo':4, 'medic':4, 'scout':8, 'pocket':4, 'roamer':4}
     if getTeamSize() == 9:
         numberOfPlayersPerClass = {'demo':2, 'engineer':2, 'heavy':2, 'medic':2, 'pyro':2, 'scout':2, 'sniper':2, 'soldier':2, 'spy':2}
     for gameClass in classList:
@@ -805,7 +810,6 @@ def ip(userName, userCommand):
     setIP(userName, userCommand)
 
 def isAdmin(userName):
-    return 1
     global adminList
     server.send_raw("PRIVMSG ChanServ :" + config.channel + " a " + userName)
     counter = 0
@@ -1020,7 +1024,7 @@ def mumble():
 def need(userName, params):
     """display players needed"""
     neededClasses = {}
-    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'soldier':4}
+    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'pocket':2, 'roamer':2}
     neededPlayers = 0
     captainsNeeded = 0
     for gameClass in classList:
@@ -1674,7 +1678,7 @@ def updateUserStatus(nick, escapedUserCommand):
             userList[nick]['last'] = time.time()
         if nick in awayList:
             del awayList[nick]
-        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('soldier') < 4):
+        if (state == 'captain' or state == 'normal') and (classCount('demo') < 2 or classCount('scout') < 4 or classCount('pocket') < 2 or classCount('roamer') < 2:
             return 0
         if len(userList) >= numberOfPlayers and len(awayList) == 0 and classCount('medic') >= numberOfMedics:
             initGame()
@@ -1696,9 +1700,9 @@ awayTimer = 0.0
 botID = 0
 captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
-classList = ['demo', 'medic', 'scout', 'soldier']
+classList = ['demo', 'medic', 'scout', 'pocket', 'roamer']
 connectTimer = threading.Timer(0, None)
-formalTeam = ['demo', 'medic', 'scout', 'scout', 'soldier', 'soldier']
+formalTeam = ['demo', 'medic', 'scout', 'scout', 'pocket', 'roamer']
 gameServer = ''
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
 initTime = int(time.time())
