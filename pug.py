@@ -19,14 +19,19 @@ import urllib2
 
 #irclib.DEBUG = 1
 
-def add(userName, userCommand):
+def add(userName, userCommand, force=0):
     global state, userLimit, userList
     print "State : " + state
-    userAuthorizationLevel = isAuthorizedToAdd(userName)
     if state != 'idle':
+        if re.search('captain', userCommand):
+            authorizationStatus = getAuthorizationStatus(userName)
+            if authorizationStatus[1] == 0 and authorizationStatus[2] != 0 and not force:
+                send("NOTICE " + userName + " : " + "You are restricted and cannot play as captain.")
+                return 0
+        userAuthorizationLevel = isAuthorizedToAdd(userName)
         winStats = getWinStats(userName)
         medicStats = getMedicStats(userName)
-        print medicStats
+        print medicStats                    
         """if userAuthorizationLevel != 3 and not isMedic(userCommand) and (medicStats['totalGamesAsMedic'] == 0 or (float(medicStats['totalGamesAsMedic']) / float(winStats[4]) < 0.05)):
             send("NOTICE " + userName + " : In order to play in this channel you must have a medic ratio of 5% or higher.")
             return 0
@@ -71,12 +76,11 @@ def add(userName, userCommand):
                 elif type(awayTimer).__name__ == 'float':
                     sendMessageToAwayPlayers()
         elif state == 'picking':
-            if initTimer.isAlive():
+            if initTimer.isAlive() or force:
                 if not classValidation(userName, userCommand):
                     return 0
                 if userName in userList:
-                    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'pocket':2, 'roamer':2}
-                    if classCount(userList[userName]['class']) < numberOfPlayersPerClass[userList[userName]['class']]:
+                    if (classCount('demo') < 3 or classCount('medic') < 3 or classCount('scout') < 5 or classCount('pocket') < 3 or classCount('roamer') < 3):
                         send("NOTICE " + userName + " : There aren't enough players in the class you previously added up as. You cannot switch at this time.")
                         return 0
                 if isInATeam(userName):
@@ -93,7 +97,7 @@ def add(userName, userCommand):
                 return 0
     else:
         send("PRIVMSG " + config.channel + " :\x030,01You can't \"!add\" until an admin has started a game.")
-
+        
 def addFriend(userName, userCommand):
     global userList
     # 2 friends limit.
@@ -136,12 +140,24 @@ def addGame(userName, userCommand):
     send("PRIVMSG " + config.channel + ' :\x030,01PUG started. Game type : ' + state + '. Type "!add" to join a game.')
 
 def analyseIRCText(connection, event):
-    global adminList, userList
+    global adminList, userList, flood #flood keeps track of spam messages
     userName = extractUserName(event.source())
     userCommand = event.arguments()[0]
     escapedChannel = cleanUserCommand(config.channel).replace('\\.', '\\\\.')
     escapedUserCommand = cleanUserCommand(event.arguments()[0])
     saveToLogs("[" + time.ctime() + "] <" + userName + "> " + userCommand + "\n")
+    # if not '-MESSENGER' in userName:
+        # if flood.has_key(userName):
+            # flood[userName][0] += 1
+        # else:
+            # flood[userName] = [1,userCommand]
+        # if flood[userName][0] > 1 and flood[userName][1] == userCommand:
+            # print 'ahahahaha' #Ignores the spammed lines
+            # return 0
+        # flood[userName][1] = userCommand
+        # if flood[userName][0] > 3:
+            # send("NOTICE " + userName + " : Warning, you are spamming. Stop immediately.") 
+            # return 0
     if userName in userList:
         updateUserStatus(userName, escapedUserCommand)
     if re.match('^.*\\\\ \\\\\(.*\\\\\)\\\\ has\\\\ access\\\\ \\\\\x02\d*\\\\\x02\\\\ in\\\\ \\\\' + escapedChannel + '\\\\.$', escapedUserCommand):
@@ -223,7 +239,10 @@ def authorize(userName, userCommand, userLevel = 1):
         return 0
     else:
         cursor = connection.cursor()
-        cursor.execute('INSERT INTO authorizations VALUES (%s, %s, %s, %s, %s)', (commandList[1], userLevel, adminLevel, time.time(), userName))
+        if authorizationStatus[4] != '':
+            cursor.execute('UPDATE authorizations SET authorized=%s, level=%s, time=%s, admin=%s WHERE nick=%s', (userLevel, adminLevel, time.time(), userName, commandList[1]))
+        else:
+            cursor.execute('INSERT INTO authorizations VALUES (%s, %s, %s, %s, %s)', (commandList[1], userLevel, adminLevel, time.time(), userName))
         cursor.execute('COMMIT;')
         send("NOTICE " + userName + " : You successfully " + authorizationText + " \"" + commandList[1] + "\" to play in \"" + config.channel + "\".") 
 
@@ -337,8 +356,8 @@ def createUser(userName, userCommand, userAuthorizationLevel):
         user['late'] = 1
     user['class'] = extractClasses(userCommand)
     if re.search('captain', userCommand):
-        if 'medic' not in user['class'] and getWinStats(userName)[1] < 20:
-            send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 20 games played.")
+        if 'medic' not in user['class'] and getWinStats(userName)[4] < 40:
+            send("NOTICE " + userName + " : " + "You don't meet the requirements to be a captain : minimum of 40 games played.")
         else:
             user['status'] = 'captain'
     user['nick'] = userName
@@ -380,6 +399,10 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!automatic', escapedUserCommand):
         setStartMode('automatic')
+        send("NOTICE " + userName + " : " + "Mode set to Automatic.")
+        return 0
+    if re.search('^\\\\!bacon', escapedUserCommand):
+        send("PRIVMSG " + config.channel + " :\x038,01*  \x039,01BACON!  \x038,01*")
         return 0
     if re.search('^\\\\!captain', escapedUserCommand):
         captain()
@@ -387,8 +410,14 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!endgame', escapedUserCommand):
         endGame()
         return 0
+    if re.search('^\\\\!fadd', escapedUserCommand):
+        fadd(userName, userCommand)
+        return 0
     if re.search('^\\\\!force', escapedUserCommand):
         force(userName)
+        return 0
+    if re.search('^\\\\!fremove', escapedUserCommand):
+        fremove(userName, userCommand)
         return 0
     if re.search('^\\\\!game', escapedUserCommand):
         game(userName, userCommand)
@@ -419,6 +448,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         return 0
     if re.search('^\\\\!manual', escapedUserCommand):
         setStartMode('manual')
+        send("NOTICE " + userName + " : " + "Mode set to Manual.")
         return 0
     if re.search('^\\\\!mumble', escapedUserCommand):
         mumble()
@@ -439,7 +469,7 @@ def executeCommand(userName, escapedUserCommand, userCommand):
         players(userName)
         return 0
     if re.search('^\\\\!prototype*', escapedUserCommand):
-        prototype()
+        #prototype()
         return 0
     if re.search('^\\\\!replace', escapedUserCommand):
         replace(userName, userCommand)
@@ -480,6 +510,20 @@ def executeCommand(userName, escapedUserCommand, userCommand):
     if re.search('^\\\\!whattimeisit', escapedUserCommand):
         send("PRIVMSG " + config.channel + " :\x038,01* \x039,01Hammertime \x038,01*")
         return 0
+    if re.search('^\\\\!who', escapedUserCommand):
+        adminLevel = isAdmin(userName)
+        if adminLevel < 300:
+            blah = random.randint(0, 100)
+            if blah < 91:
+                send("PRIVMSG " + config.channel + " :\x038,01* \x039,01" + userName + " is a noob \x038,01*")
+            elif blah < 95:
+                send("PRIVMSG " + config.channel + " :\x038,01* \x039,01" + userName + " is a pro \x038,01*")
+            else:
+                send("PRIVMSG " + config.channel + " :\x038,01* \x039,01" + userName + " needs to play medic more \x038,01*")
+            return 0
+        else: 
+            send("PRIVMSG " + config.channel + " :\x038,01* \x039,01" + userName + " is awesome \x038,01*")
+            return 0
 
 def extractClasses(userCommand):
     global classList
@@ -497,6 +541,25 @@ def extractUserName(user):
     else:
         return ''
 
+def fadd(userName, userCommand):
+    commandList = string.split(userCommand, ' ')
+    adminLevel = isAdmin(userName)
+    # print '......'
+    # print userCommand
+    # print commandList
+    # print '......'
+    if adminLevel < 200:
+        send("PRIVMSG " + config.channel + " :\x030,01Warning " + userName + ", you are trying an admin command.")
+        return 0
+    if len(commandList) < 2:
+        send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid \"!fadd\" command : \"!fadd nick class \".")
+        return 0
+    commandList[1] = commandList[1].replace("\\", "")
+    #commandList[2] = commandList[2].replace("\\", "")
+    print 'fadd triggered on ' + commandList[1]
+    #add(commandList[1], commandList[2], 1)
+    add(commandList[1], userCommand, 1)
+        
 def findAwayUsers():
     global awayList, userList
     if type(awayTimer).__name__ == 'float' and time.time() - awayTimer <= (3 * 60):
@@ -511,9 +574,30 @@ def findAwayUsers():
                     awayList[user] = userList[user]
     return awayList
 
+def floodClear():
+    global flood
+    while 1:
+        #print "flood being cleared"
+        #print flood
+        flood = {} # Clear the list every 2 seconds
+        time.sleep(2) 
+    
 def force(userName):
     scramble(userName, 1)
 
+def fremove(userName, userCommand):
+    commandList = string.split(userCommand, ' ')
+    adminLevel = isAdmin(userName)
+    if adminLevel < 200:
+        send("PRIVMSG " + config.channel + " :\x030,01Warning " + userName + ", you are trying an admin command.")
+        return 0
+    if len(commandList) < 2:
+        send("NOTICE " + userName + " : Error, your command has too few arguments. Here is an example of a valid \"!fremove\" command : \"!fremove nick \".")
+        return 0
+    commandList[1] = commandList[1].replace("\\", "")
+    print 'fremove triggered on ' + commandList[1]
+    remove(commandList[1], 1, 1)
+    
 def game(userName, userCommand):
     global captainStageList, state
     mode = userCommand.split(' ')
@@ -787,11 +871,12 @@ def getUserCount():
     return counter
 
 def getWinStats(userName):
+    userName2 = userName.replace("\\", "")
     cursor = connection.cursor()
-    cursor.execute('SELECT lower(nick) AS nick, count(*), sum(result), (SELECT count(*) FROM stats WHERE nick ILIKE %s AND botID = %s) AS total FROM (SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s ORDER BY TIME DESC LIMIT 20) AS stats GROUP BY lower(nick)', (userName, botID, userName, botID))
+    cursor.execute('SELECT lower(nick) AS nick, count(*), sum(result), (SELECT count(*) FROM stats WHERE nick ILIKE %s AND botID = %s) AS total FROM (SELECT * FROM stats WHERE nick ILIKE %s AND botID = %s ORDER BY TIME DESC LIMIT 20) AS stats GROUP BY lower(nick)', (userName2, botID, userName2, botID))
     for row in cursor.fetchall():
         return [row[0], row[1], row[2], float((float(row[2]) + float(row[1])) / float(row[1] * 2)), row[3]]
-    return [userName, 0, 0, 0, 0]
+    return [userName2, 0, 0, 0, 0]
 
 def help():
     send("PRIVMSG " + config.channel + " :\x030,01If you need the help of an admin type !admin, for any other help please visit \x0311,01http://steamcommunity.com/groups/tf2mix/discussions/0/882961586767057144/\x030,01 to get help about the PUG process.")
@@ -1112,6 +1197,21 @@ def pick(userName, userCommand):
     if re.search('^[0-9][0-9]*$', commandList[0]) and getPlayerName(int(commandList[0])):
         commandList[0] = getPlayerName(int(commandList[0]))
         userFound = 1
+    elif re.search('random', commandList[0]): #if random
+        pickClass = extractClasses(userCommand)
+        if pickClass not in classList:
+            return 0
+        randomList = []
+        for userN in userList.copy():
+            if pickClass in userList[userN]['class']:
+                randomList.append(userList[userN]['nick'])
+        print randomList
+        if len(randomList):
+            blah = random.randint(0, len(randomList)-1)
+            commandList[0] = randomList[blah]
+        else:
+            return 0
+        userFound = 1
     else:
         # Check if this nickname exists in the player list.
         for user in userList.copy():
@@ -1304,7 +1404,12 @@ def replace(userName, userCommand):
     else:
         send("NOTICE " + userName + " : Error, the user you specified to replace is not listed in a team.")
         return 0
+    numberOfPlayersPerClass = {'demo':2, 'medic':2, 'scout':4, 'pocket':2, 'roamer':2}
     if substitute in userList:
+        subClass = userList[substitute]['class']
+        if classCount(subClass) < (numberOfPlayersPerClass[subClass] + 1):
+            send("NOTICE " + userName + " : Error, the class of your sub does not have enough players.")
+            return 0
         userList[substitute]['status'] = 'captain'
         assignUserToTeam('medic', 0, toReplaceTeam, userList[substitute])
         team[counter]['status'] = ''
@@ -1314,9 +1419,9 @@ def replace(userName, userCommand):
         send("NOTICE " + userName + " : Error, the substitute you specified is not in the subscribed list.")
     return 0
 
-def remove(userName, printUsers = 1):
+def remove(userName, printUsers = 1, force=0):
     global initTimer, state, userLimit, userList
-    if(isUser(userName)) and (state == 'picking' or state == 'building'):
+    if(isUser(userName)) and (state == 'picking' or state == 'building') and (force == 0):
         send("NOTICE " + userName + " : Warning, you removed but the teams are getting drafted at the moment and there are still some chances that you will get in this PUG. Make sure you clearly announce to the users in the channel and to the captains that you may need a substitute.")
         userList[userName]['remove'] = 1
     elif isUser(userName):
@@ -1375,6 +1480,10 @@ def restartServer():
         return 0
 
 def restrict(userName, userCommand):
+    adminLevel = isAdmin(userName)
+    if adminLevel < 200:
+        send("PRIVMSG " + config.channel + " :\x030,01Warning " + userName + ", you are trying an admin command.")
+        return 0
     authorize(userName, userCommand, 0)
 
 def saveStats():
@@ -1556,6 +1665,7 @@ def stats(userName, userCommand):
         return 0
     if commandList[1] == 'me':
         commandList[1] = userName
+    commandList[1] = commandList[1].replace("\\", "")
     authorizationStatus = getAuthorizationStatus(commandList[1])
     authorizedBy = ''
     medicStats = getMedicStats(commandList[1])
@@ -1612,6 +1722,7 @@ def sub(userName, userCommand):
     subIndex = getSubIndex(id)
     send("PRIVMSG " + userName + " :You are the substitute for a game that is about to start or that has already started. Connect as soon as possible to this TF2 server : \"connect " + subList[subIndex]['server'] + "; password " + password + ";\". Connect as well to the voIP server, for more information type \"!mumble\" in \"#tf2mix\".")
     del(subList[subIndex])
+    remove(userName, 0, 1)
     return 0
 
 def surf(userName, userCommand):
@@ -1692,7 +1803,7 @@ def welcome(connection, event):
 nick = 'PUGBOT'
 name = 'BOT'
 
-adminCommands = ["\\!addgame", "\\!authorize", "\\!automatic", "\\!endgame", "\\!force", "\\!invite", "\\!manual", "\\!prototype", "\\!replace", "\\!restart", "\\!restrict"]
+adminCommands = ["\\!addgame", "\\!authorize", "\\!automatic", "\\!bacon", "\\!fadd", "\\!endgame", "\\!force", "\\!fremove", "\\!invite", "\\!manual", "\\!prototype", "\\!replace", "\\!restart", "\\!restrict"]
 adminList = {}
 allowFriends = 1
 awayList = {}
@@ -1702,6 +1813,7 @@ captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
 classList = ['demo', 'medic', 'scout', 'pocket', 'roamer']
 connectTimer = threading.Timer(0, None)
+flood = {}
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'pocket', 'roamer']
 gameServer = ''
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
@@ -1728,7 +1840,7 @@ startGameTimer = threading.Timer(0, None)
 subList = []
 surferList = {}
 timerInfo = 0
-userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!admin", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit"]
+userCommands = ["\\!add", "\\!addfriend", "\\!addfriends", "\\!admin", "\\!away", "\\!captain", "\\!game", "\\!help", "\\!ip", "\\!last", "\\!limit", "\\!list", "\\!man", "\\!map", "\\!mumble", "\\!need", "\\!needsub", "\\!notice", "\\!pick", "\\!players", "\\!ready", "\\!remove", "\\!report", "\\!scramble", "\\!stats", "\\!status", "\\!sub", "\\!surf", "\\!surfer", "\\!votemap", "\\!whattimeisit", "\\!who"]
 userLimit = 12
 userList = {}
 voiceServer = {'ip':'mumble.atf2.org', 'port':'64738'}
@@ -1755,6 +1867,7 @@ irc.add_global_handler('welcome', welcome)
 
 # Start the server listening.
 thread.start_new_thread(listeningTF2Servers, ())
+#thread.start_new_thread(floodClear,())
 
 # Jump into an infinite loop
 while not restart:
