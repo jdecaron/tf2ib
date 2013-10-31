@@ -140,24 +140,12 @@ def addGame(userName, userCommand):
     send("PRIVMSG " + config.channel + ' :\x030,01PUG started. Game type : ' + state + '. Type "!add" to join a game.')
 
 def analyseIRCText(connection, event):
-    global adminList, userList, flood #flood keeps track of spam messages
+    global adminList, userList
     userName = extractUserName(event.source())
     userCommand = event.arguments()[0]
     escapedChannel = cleanUserCommand(config.channel).replace('\\.', '\\\\.')
     escapedUserCommand = cleanUserCommand(event.arguments()[0])
     saveToLogs("[" + time.ctime() + "] <" + userName + "> " + userCommand + "\n")
-    # if not '-MESSENGER' in userName:
-        # if flood.has_key(userName):
-            # flood[userName][0] += 1
-        # else:
-            # flood[userName] = [1,userCommand]
-        # if flood[userName][0] > 1 and flood[userName][1] == userCommand:
-            # print 'ahahahaha' #Ignores the spammed lines
-            # return 0
-        # flood[userName][1] = userCommand
-        # if flood[userName][0] > 3:
-            # send("NOTICE " + userName + " : Warning, you are spamming. Stop immediately.") 
-            # return 0
     if userName in userList:
         updateUserStatus(userName, escapedUserCommand)
     if re.match('^.*\\\\ \\\\\(.*\\\\\)\\\\ has\\\\ access\\\\ \\\\\x02\d*\\\\\x02\\\\ in\\\\ \\\\' + escapedChannel + '\\\\.$', escapedUserCommand):
@@ -574,14 +562,6 @@ def findAwayUsers():
                     awayList[user] = userList[user]
     return awayList
 
-def floodClear():
-    global flood
-    while 1:
-        #print "flood being cleared"
-        #print flood
-        flood = {} # Clear the list every 2 seconds
-        time.sleep(2) 
-    
 def force(userName):
     scramble(userName, 1)
 
@@ -1813,7 +1793,6 @@ captainStage = 0
 captainStageList = ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'b', 'b', 'a']
 classList = ['demo', 'medic', 'scout', 'pocket', 'roamer']
 connectTimer = threading.Timer(0, None)
-flood = {}
 formalTeam = ['demo', 'medic', 'scout', 'scout', 'pocket', 'roamer']
 gameServer = ''
 gamesurgeCommands = ["\\!access", "\\!addcoowner", "\\!addmaster", "\\!addop", "\\!addpeon", "\\!adduser", "\\!clvl", "\\!delcoowner", "\\!deleteme", "\\!delmaster", "\\!delop", "\\!delpeon", "\\!deluser", "\\!deop", "\\!down", "\\!downall", "\\!devoice", "\\!giveownership", "\\!resync", "\\!trim", "\\!unsuspend", "\\!upall", "\\!uset", "\\!voice", "\\!wipeinfo"]
@@ -1867,7 +1846,6 @@ irc.add_global_handler('welcome', welcome)
 
 # Start the server listening.
 thread.start_new_thread(listeningTF2Servers, ())
-#thread.start_new_thread(floodClear,())
 
 # Jump into an infinite loop
 while not restart:
